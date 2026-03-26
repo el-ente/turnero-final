@@ -2,10 +2,38 @@ import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
+import { db } from './lib/firebase'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 import './App.css'
 
 function App() {
   const [count, setCount] = useState(0)
+  const [firestoreData, setFirestoreData] = useState<string | null>(null)
+
+  const readFromFirestore = async () => {
+    try {
+      const docRef = doc(db, 'test', 'message')
+      const docSnap = await getDoc(docRef)
+      if (docSnap.exists()) {
+        setFirestoreData(docSnap.data().message || 'No message field')
+      } else {
+        setFirestoreData('Document does not exist')
+      }
+    } catch (error: unknown) {
+      setFirestoreData(`Error: ${ (error as Error).message }`)
+    }
+  }
+
+  const writeToFirestore = async () => {
+    try {
+      await setDoc(doc(db, 'test', 'message'), {
+        message: 'Hola desde Firebase! Las env vars funcionan correctamente.'
+      })
+      setFirestoreData('Documento escrito exitosamente')
+    } catch (error: unknown) {
+      setFirestoreData(`Error escribiendo: ${ (error as Error).message }`)
+    }
+  }
 
   return (
     <>
@@ -27,6 +55,19 @@ function App() {
         >
           Count is {count}
         </button>
+        <button
+          className="counter"
+          onClick={readFromFirestore}
+        >
+          Leer de Firestore
+        </button>
+        <button
+          className="counter"
+          onClick={writeToFirestore}
+        >
+          Escribir a Firestore
+        </button>
+        {firestoreData && <p>Firestore data: {firestoreData}</p>}
       </section>
 
       <div className="ticks"></div>
