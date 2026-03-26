@@ -8,6 +8,7 @@ import {
   recallTurnHandler,
   noShowHandler,
 } from "./controllers/terminalController";
+import { getQueueStatsHandler, updateQueueConfigHandler } from "./controllers/adminController";
 
 setGlobalOptions({ maxInstances: 10 });
 
@@ -22,3 +23,7 @@ export const startTurn = startTurnHandler;
 export const finishTurn = finishTurnHandler;
 export const recallTurn = recallTurnHandler;
 export const noShow = noShowHandler;
+
+// Admin endpoints
+export const getQueueStats = getQueueStatsHandler;
+export const updateQueueConfig = updateQueueConfigHandler;
