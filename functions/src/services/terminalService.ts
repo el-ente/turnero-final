@@ -2,7 +2,7 @@ import { Turn, TurnStatus, Terminal, ServingStrategy } from "shared";
 import { db } from "../config/firebase-admin";
 import { NotFoundError, ConflictError } from "../utils/errors";
 import { getWaitingTurnsAcrossQueues } from "./queueService";
-import { updateTurnStatus } from "./turnService";
+import { updateTurnStatus, noShowTurn } from "./turnService";
 
 export async function getNextTurn(terminalId: string): Promise<Turn | null> {
   const terminalDoc = await db.collection("terminals").doc(terminalId).get();
@@ -173,5 +173,48 @@ export async function finishTurn(terminalId: string, turnId: string): Promise<vo
         currentTurnId: "",
       });
     }
+  });
+}
+
+export async function recallTurn(terminalId: string, turnId: string): Promise<void> {
+  const turnDoc = await db.collection("turns").doc(turnId).get();
+  if (!turnDoc.exists) {
+    throw new NotFoundError(`Turn ${turnId} not found`);
+  }
+
+  const turn = turnDoc.data() as Turn;
+  if (turn.status !== TurnStatus.CALLED) {
+    throw new ConflictError(`Turn is not in CALLED status (current: ${turn.status})`);
+  }
+
+  // Re-call the turn (set status back to called)
+  await db.collection("turns").doc(turnId).update({
+    recallCount: turn.recallCount + 1,
+  });
+}
+
+export async function handleNoShow(terminalId: string, turnId: string): Promise<void> {
+  const terminalDoc = await db.collection("terminals").doc(terminalId).get();
+  if (!terminalDoc.exists) {
+    throw new NotFoundError(`Terminal ${terminalId} not found`);
+  }
+
+  const turnDoc = await db.collection("turns").doc(turnId).get();
+  if (!turnDoc.exists) {
+    throw new NotFoundError(`Turn ${turnId} not found`);
+  }
+
+  const turn = turnDoc.data() as Turn;
+  if (turn.status !== TurnStatus.CALLED) {
+    throw new ConflictError(`Turn is not in CALLED status (current: ${turn.status})`);
+  }
+
+  await db.runTransaction(async (transaction) => {
+    await noShowTurn(turnId);
+
+    // Clear terminal's current turn
+    transaction.update(db.collection("terminals").doc(terminalId), {
+      currentTurnId: "",
+    });
   });
 }

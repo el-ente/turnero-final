@@ -5,6 +5,8 @@ import {
   callTurnHandler,
   startTurnHandler,
   finishTurnHandler,
+  recallTurnHandler,
+  noShowHandler,
 } from "./controllers/terminalController";
 
 setGlobalOptions({ maxInstances: 10 });
@@ -18,3 +20,5 @@ export const nextTurn = nextTurnHandler;
 export const callTurn = callTurnHandler;
 export const startTurn = startTurnHandler;
 export const finishTurn = finishTurnHandler;
+export const recallTurn = recallTurnHandler;
+export const noShow = noShowHandler;

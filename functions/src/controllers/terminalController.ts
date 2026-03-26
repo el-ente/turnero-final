@@ -1,5 +1,5 @@
 import { onRequest } from "firebase-functions/v2/https";
-import { getNextTurn, callTurn, startTurn, finishTurn } from "../services/terminalService";
+import { getNextTurn, callTurn, startTurn, finishTurn, recallTurn, handleNoShow } from "../services/terminalService";
 import { BusinessError } from "../utils/errors";
 import { logger } from "../config/firebase-admin";
 
@@ -103,6 +103,56 @@ export const finishTurnHandler = onRequest(async (req, res) => {
       res.status(error.statusCode).json({ error: error.message, code: error.code });
     } else {
       logger.error("Error finishing turn:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+});
+
+export const recallTurnHandler = onRequest(async (req, res) => {
+  try {
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const { terminalId, turnId } = req.body;
+    if (!terminalId || !turnId) {
+      res.status(400).json({ error: "terminalId and turnId are required" });
+      return;
+    }
+
+    await recallTurn(terminalId, turnId);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    if (error instanceof BusinessError) {
+      res.status(error.statusCode).json({ error: error.message, code: error.code });
+    } else {
+      logger.error("Error recalling turn:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+});
+
+export const noShowHandler = onRequest(async (req, res) => {
+  try {
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const { terminalId, turnId } = req.body;
+    if (!terminalId || !turnId) {
+      res.status(400).json({ error: "terminalId and turnId are required" });
+      return;
+    }
+
+    await handleNoShow(terminalId, turnId);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    if (error instanceof BusinessError) {
+      res.status(error.statusCode).json({ error: error.message, code: error.code });
+    } else {
+      logger.error("Error handling no-show:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   }
