@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import { TotemView } from './views/TotemView'
 import { PublicDisplay } from './views/PublicDisplay'
 import { TerminalView } from './views/TerminalView'
+import { AdminView } from './views/AdminView'
 import './App.css'
 
 function App() {
@@ -27,7 +28,7 @@ function App() {
             <Routes>
               <Route path="/" element={<TotemView />} />
               <Route path="/terminal" element={<TerminalView />} />
-              <Route path="/admin" element={<div className="placeholder">Admin (Fase 10)</div>} />
+              <Route path="/admin" element={<AdminView />} />
             </Routes>
           </div>
         } />
