@@ -1,11 +1,13 @@
-export enum TurnStatus {
-  WAITING = "waiting",
-  CALLED = "called",
-  ATTENDING = "attending",
-  FINISHED = "finished",
-  NO_SHOW = "no_show",
-  CANCELLED = "cancelled",
-}
+export const TurnStatus = {
+  WAITING: "waiting",
+  CALLED: "called",
+  ATTENDING: "attending",
+  FINISHED: "finished",
+  NO_SHOW: "no_show",
+  CANCELLED: "cancelled",
+} as const;
+
+export type TurnStatus = typeof TurnStatus[keyof typeof TurnStatus];
 
 export type Channel = "totem" | "whatsapp" | "mobile";
 

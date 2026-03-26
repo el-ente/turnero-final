@@ -1,7 +1,8 @@
-export declare enum QueueType {
-    NORMAL = "normal",
-    PRIORITY = "priority"
-}
+export declare const QueueType: {
+    readonly NORMAL: "normal";
+    readonly PRIORITY: "priority";
+};
+export type QueueType = typeof QueueType[keyof typeof QueueType];
 export interface ReenqueueConfig {
     enabled: boolean;
     maxAttempts: number;

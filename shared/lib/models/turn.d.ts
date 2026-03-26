@@ -1,11 +1,12 @@
-export declare enum TurnStatus {
-    WAITING = "waiting",
-    CALLED = "called",
-    ATTENDING = "attending",
-    FINISHED = "finished",
-    NO_SHOW = "no_show",
-    CANCELLED = "cancelled"
-}
+export declare const TurnStatus: {
+    readonly WAITING: "waiting";
+    readonly CALLED: "called";
+    readonly ATTENDING: "attending";
+    readonly FINISHED: "finished";
+    readonly NO_SHOW: "no_show";
+    readonly CANCELLED: "cancelled";
+};
+export type TurnStatus = typeof TurnStatus[keyof typeof TurnStatus];
 export type Channel = "totem" | "whatsapp" | "mobile";
 export interface Turn {
     id: string;

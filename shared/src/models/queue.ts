@@ -1,7 +1,9 @@
-export enum QueueType {
-  NORMAL = "normal",
-  PRIORITY = "priority",
-}
+export const QueueType = {
+  NORMAL: "normal",
+  PRIORITY: "priority",
+} as const;
+
+export type QueueType = typeof QueueType[keyof typeof QueueType];
 
 export interface ReenqueueConfig {
   enabled: boolean;

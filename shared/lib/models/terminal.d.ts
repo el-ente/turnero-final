@@ -1,7 +1,8 @@
-export declare enum ServingStrategy {
-    RATIO_BASED = "ratio_based",
-    FIFO_ACROSS_QUEUES = "fifo_across_queues"
-}
+export declare const ServingStrategy: {
+    readonly RATIO_BASED: "ratio_based";
+    readonly FIFO_ACROSS_QUEUES: "fifo_across_queues";
+};
+export type ServingStrategy = typeof ServingStrategy[keyof typeof ServingStrategy];
 export interface RatioBasedConfig {
     normalQueueRatio: number;
     priorityQueueRatio: number;
@@ -12,11 +13,12 @@ export interface StrategyConfig {
     strategy: ServingStrategy;
     ratioBased?: RatioBasedConfig;
 }
-export declare enum TerminalStatus {
-    AVAILABLE = "available",
-    BUSY = "busy",
-    OFFLINE = "offline"
-}
+export declare const TerminalStatus: {
+    readonly AVAILABLE: "available";
+    readonly BUSY: "busy";
+    readonly OFFLINE: "offline";
+};
+export type TerminalStatus = typeof TerminalStatus[keyof typeof TerminalStatus];
 export interface Terminal {
     id: string;
     name: string;
