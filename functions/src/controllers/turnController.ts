@@ -3,7 +3,7 @@ import { createTurn, getCurrentTurn } from "../services/turnService";
 import { BusinessError } from "../utils/errors";
 import { logger } from "../config/firebase-admin";
 
-export const createTurnHandler = onRequest(async (req, res) => {
+export const createTurnHandler = onRequest({ cors: true }, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
@@ -29,7 +29,7 @@ export const createTurnHandler = onRequest(async (req, res) => {
   }
 });
 
-export const getCurrentTurnHandler = onRequest(async (req, res) => {
+export const getCurrentTurnHandler = onRequest({ cors: true }, async (req, res) => {
   try {
     if (req.method !== "GET") {
       res.status(405).json({ error: "Method not allowed" });

@@ -3,7 +3,7 @@ import { getQueueStats } from "../services/statsService";
 import { BusinessError } from "../utils/errors";
 import { db, logger } from "../config/firebase-admin";
 
-export const getQueueStatsHandler = onRequest(async (req, res) => {
+export const getQueueStatsHandler = onRequest({ cors: true }, async (req, res) => {
   try {
     if (req.method !== "GET") {
       res.status(405).json({ error: "Method not allowed" });
@@ -28,7 +28,7 @@ export const getQueueStatsHandler = onRequest(async (req, res) => {
   }
 });
 
-export const updateQueueConfigHandler = onRequest(async (req, res) => {
+export const updateQueueConfigHandler = onRequest({ cors: true }, async (req, res) => {
   try {
     if (req.method !== "PUT") {
       res.status(405).json({ error: "Method not allowed" });

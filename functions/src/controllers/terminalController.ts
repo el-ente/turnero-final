@@ -3,7 +3,7 @@ import { getNextTurn, callTurn, startTurn, finishTurn, recallTurn, handleNoShow 
 import { BusinessError } from "../utils/errors";
 import { logger } from "../config/firebase-admin";
 
-export const nextTurnHandler = onRequest(async (req, res) => {
+export const nextTurnHandler = onRequest({ cors: true }, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
@@ -33,7 +33,7 @@ export const nextTurnHandler = onRequest(async (req, res) => {
   }
 });
 
-export const callTurnHandler = onRequest(async (req, res) => {
+export const callTurnHandler = onRequest({ cors: true }, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
@@ -58,7 +58,7 @@ export const callTurnHandler = onRequest(async (req, res) => {
   }
 });
 
-export const startTurnHandler = onRequest(async (req, res) => {
+export const startTurnHandler = onRequest({ cors: true }, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
@@ -83,7 +83,7 @@ export const startTurnHandler = onRequest(async (req, res) => {
   }
 });
 
-export const finishTurnHandler = onRequest(async (req, res) => {
+export const finishTurnHandler = onRequest({ cors: true }, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
@@ -108,7 +108,7 @@ export const finishTurnHandler = onRequest(async (req, res) => {
   }
 });
 
-export const recallTurnHandler = onRequest(async (req, res) => {
+export const recallTurnHandler = onRequest({ cors: true }, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
@@ -133,7 +133,7 @@ export const recallTurnHandler = onRequest(async (req, res) => {
   }
 });
 
-export const noShowHandler = onRequest(async (req, res) => {
+export const noShowHandler = onRequest({ cors: true }, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
