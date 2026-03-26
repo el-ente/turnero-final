@@ -10,8 +10,9 @@ import {
   noShowTurn,
   recallTurn,
 } from "../lib/api";
+import { toDate } from "../lib/dates";
 
-const TERMINAL_ID = "terminal-1"; // For demo, hardcoded
+const TERMINAL_ID = "terminal-1";
 
 export function TerminalView() {
   const [terminal, setTerminal] = useState<Terminal | null>(null);
@@ -20,7 +21,6 @@ export function TerminalView() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Load terminal config
   useEffect(() => {
     const loadTerminal = async () => {
       try {
@@ -35,42 +35,35 @@ export function TerminalView() {
     loadTerminal();
   }, []);
 
-  // Real-time listener for waiting turns in active queues
   useEffect(() => {
     if (!terminal) return;
-
     const q = query(
       collection(db, "turns"),
       where("queueId", "in", terminal.activeQueueIds),
       where("status", "==", "waiting")
     );
-
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const turns = snapshot.docs
         .map((doc) => doc.data() as Turn)
         .sort((a, b) => {
           const numCmp = a.currentTurnNumber - b.currentTurnNumber;
-          return numCmp !== 0 ? numCmp : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          return numCmp !== 0 ? numCmp : toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime();
         });
       setWaitingTurns(turns);
     });
-
     return unsubscribe;
   }, [terminal?.activeQueueIds]);
 
-  // Load current turn if exists
   useEffect(() => {
     if (!terminal?.currentTurnId) {
       setCurrentTurn(null);
       return;
     }
-
     const loadCurrentTurn = async () => {
       try {
         const turnDoc = await getDoc(doc(db, "turns", terminal.currentTurnId!));
         if (turnDoc.exists()) {
-          const turnData = turnDoc.data() as Turn;
-          setCurrentTurn(turnData);
+          setCurrentTurn(turnDoc.data() as Turn);
         } else {
           setCurrentTurn(null);
         }
@@ -122,7 +115,7 @@ export function TerminalView() {
     setLoading(true);
     try {
       await startTurn(TERMINAL_ID, currentTurn.id);
-      showMessage("success", "Atención iniciada");
+      showMessage("success", "Atencion iniciada");
     } catch (err) {
       showMessage("error", err instanceof Error ? err.message : "Error");
     } finally {
@@ -172,483 +165,439 @@ export function TerminalView() {
   };
 
   return (
-    <div className="terminal-view">
-      {/* Control Panel */}
-      <div className="control-panel">
-        <div className="terminal-info">
-          <div className="terminal-id">{TERMINAL_ID}</div>
-          <div className="terminal-status">EN LÍNEA</div>
+    <div className="term">
+      {/* Sidebar */}
+      <aside className="term-sidebar">
+        <div className="term-identity">
+          <div className="term-id-dot"></div>
+          <div>
+            <div className="term-id-name">{TERMINAL_ID}</div>
+            <div className="term-id-status">En linea</div>
+          </div>
         </div>
 
-        <div className="action-buttons">
-          <button
-            className="btn btn-primary"
-            onClick={handleNextTurn}
-            disabled={loading || !terminal}
-          >
-            <span className="btn-icon">→</span>
-            <span>Próximo</span>
+        <div className="term-actions">
+          <button className="term-btn term-btn-primary" onClick={handleNextTurn} disabled={loading || !terminal}>
+            Proximo turno
+          </button>
+          <button className="term-btn term-btn-default" onClick={handleCallTurn} disabled={loading || !currentTurn}>
+            Llamar
+          </button>
+          <button className="term-btn term-btn-default" onClick={handleStartTurn} disabled={loading || !currentTurn}>
+            Iniciar atencion
+          </button>
+          <button className="term-btn term-btn-success" onClick={handleFinishTurn} disabled={loading || !currentTurn}>
+            Finalizar
           </button>
 
-          <button
-            className="btn btn-call"
-            onClick={handleCallTurn}
-            disabled={loading || !currentTurn}
-          >
-            <span className="btn-icon">📢</span>
-            <span>Llamar</span>
-          </button>
+          <div className="term-actions-divider"></div>
 
-          <button
-            className="btn btn-start"
-            onClick={handleStartTurn}
-            disabled={loading || !currentTurn}
-          >
-            <span className="btn-icon">▶</span>
-            <span>Iniciar</span>
+          <button className="term-btn term-btn-outline" onClick={handleRecallTurn} disabled={loading || !currentTurn}>
+            Re-llamar
           </button>
-
-          <button
-            className="btn btn-finish"
-            onClick={handleFinishTurn}
-            disabled={loading || !currentTurn}
-          >
-            <span className="btn-icon">✓</span>
-            <span>Finalizar</span>
-          </button>
-
-          <button
-            className="btn btn-recall"
-            onClick={handleRecallTurn}
-            disabled={loading || !currentTurn}
-          >
-            <span className="btn-icon">🔄</span>
-            <span>Re-llamar</span>
-          </button>
-
-          <button
-            className="btn btn-noshow"
-            onClick={handleNoShow}
-            disabled={loading || !currentTurn}
-          >
-            <span className="btn-icon">✗</span>
-            <span>No Presentó</span>
+          <button className="term-btn term-btn-danger" onClick={handleNoShow} disabled={loading || !currentTurn}>
+            No presento
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* Main Display */}
-      <div className="main-area">
-        {/* Current Turn Display */}
-        <div className="current-turn-display">
+      {/* Main */}
+      <main className="term-main">
+        <div className="term-current">
           {currentTurn ? (
             <>
-              <div className="turn-header">ATENDIENDO</div>
-              <div className="turn-number">{currentTurn.currentTurnNumber}</div>
-              <div className="turn-status-badge">{currentTurn.status.toUpperCase()}</div>
+              <span className="term-current-label">Atendiendo</span>
+              <div className="term-current-number">{currentTurn.currentTurnNumber}</div>
+              <span className={`term-status-pill term-status-${currentTurn.status}`}>
+                {currentTurn.status}
+              </span>
               {currentTurn.recallCount > 0 && (
-                <div className="turn-meta">Reintentos: {currentTurn.recallCount}</div>
+                <span className="term-recall-badge">Reintentos: {currentTurn.recallCount}</span>
               )}
             </>
           ) : (
-            <div className="empty-state">
-              <div className="empty-icon">—</div>
-              <div className="empty-text">Sin turno asignado</div>
+            <div className="term-empty">
+              <div className="term-empty-icon">—</div>
+              <div className="term-empty-text">Sin turno asignado</div>
             </div>
           )}
         </div>
 
-        {/* Waiting Queue */}
-        <div className="waiting-queue">
-          <div className="queue-header">COLA DE ESPERA ({waitingTurns.length})</div>
-          <div className="queue-list">
+        <div className="term-queue">
+          <div className="term-queue-header">
+            Cola de espera
+            <span className="term-queue-count">{waitingTurns.length}</span>
+          </div>
+          <div className="term-queue-list">
             {waitingTurns.slice(0, 10).map((turn, idx) => (
-              <div key={turn.id} className="queue-item" style={{ animationDelay: `${idx * 0.05}s` }}>
-                <span className="queue-number">{turn.currentTurnNumber}</span>
-                <span className="queue-time">
-                  {new Date(turn.createdAt).toLocaleTimeString("es-AR")}
+              <div key={turn.id} className="term-queue-item" style={{ animationDelay: `${idx * 0.04}s` }}>
+                <span className="term-queue-num">{turn.currentTurnNumber}</span>
+                <span className="term-queue-time">
+                  {toDate(turn.createdAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
                 </span>
-                {turn.recallCount > 0 && <span className="queue-requeue">R{turn.recallCount}</span>}
+                {turn.recallCount > 0 && <span className="term-queue-r">R{turn.recallCount}</span>}
               </div>
             ))}
-            {waitingTurns.length === 0 && <div className="queue-empty">Sin turnos esperando</div>}
+            {waitingTurns.length === 0 && (
+              <div className="term-queue-empty">Sin turnos esperando</div>
+            )}
           </div>
         </div>
-      </div>
+      </main>
 
-      {/* Message */}
+      {/* Toast */}
       {message && (
-        <div className={`message message-${message.type}`}>
+        <div className={`term-toast term-toast-${message.type}`}>
           {message.text}
         </div>
       )}
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;600;700&display=swap');
-
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-
-        .terminal-view {
-          width: 100%;
-          height: 100vh;
-          background: linear-gradient(135deg, #0d1117 0%, #1a1f2e 100%);
+        .term {
           display: grid;
-          grid-template-columns: 300px 1fr;
-          grid-template-rows: auto 1fr;
-          color: #fff;
-          font-family: 'Outfit', sans-serif;
-          overflow: hidden;
-          position: relative;
+          grid-template-columns: 260px 1fr;
+          min-height: calc(100vh - 64px);
+          background: var(--bg);
         }
 
-        /* Control Panel */
-        .control-panel {
-          grid-column: 1;
-          grid-row: 1 / 3;
-          background: #0a0d13;
-          border-right: 3px solid #0ffe00;
-          padding: 2rem;
+        /* Sidebar */
+        .term-sidebar {
+          background: var(--surface);
+          border-right: 1px solid var(--border);
+          padding: 1.5rem;
           display: flex;
           flex-direction: column;
-          gap: 2rem;
-          overflow-y: auto;
+          gap: 1.5rem;
         }
 
-        .terminal-info {
-          text-align: center;
-          padding: 1.5rem;
-          border: 2px solid #0ffe00;
-          border-radius: 0;
-          background: rgba(15, 254, 0, 0.05);
+        .term-identity {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 1rem;
+          background: var(--surface-warm);
+          border-radius: var(--radius);
         }
 
-        .terminal-id {
-          font-family: 'Space Mono', monospace;
-          font-size: 1.2rem;
-          font-weight: 700;
-          color: #0ffe00;
-          letter-spacing: 1px;
+        .term-id-dot {
+          width: 10px;
+          height: 10px;
+          background: var(--secondary);
+          border-radius: 50%;
+          flex-shrink: 0;
+          animation: pulse-online 2.5s ease-in-out infinite;
         }
 
-        .terminal-status {
-          font-size: 0.8rem;
-          color: #0ffe00;
-          margin-top: 0.5rem;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          animation: blink-status 2s ease-in-out infinite;
-        }
-
-        @keyframes blink-status {
+        @keyframes pulse-online {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.4; }
         }
 
-        .action-buttons {
+        .term-id-name {
+          font-weight: 600;
+          font-size: 0.9rem;
+          color: var(--text);
+        }
+
+        .term-id-status {
+          font-size: 0.75rem;
+          color: var(--secondary);
+          font-weight: 500;
+        }
+
+        .term-actions {
           display: flex;
           flex-direction: column;
-          gap: 0.8rem;
-        }
-
-        .btn {
-          padding: 1rem;
-          border: 2px solid transparent;
-          border-radius: 0;
-          background: rgba(15, 254, 0, 0.1);
-          color: #fff;
-          cursor: pointer;
-          font-family: 'Outfit', sans-serif;
-          font-size: 0.95rem;
-          font-weight: 600;
-          letter-spacing: 0.5px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
           gap: 0.5rem;
-          transition: all 0.2s;
-          text-transform: uppercase;
+          flex: 1;
         }
 
-        .btn-icon {
-          font-size: 1.2rem;
+        .term-actions-divider {
+          height: 1px;
+          background: var(--border-light);
+          margin: 0.25rem 0;
         }
 
-        .btn:disabled {
-          opacity: 0.3;
+        .term-btn {
+          padding: 0.75rem 1rem;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm);
+          cursor: pointer;
+          font-family: var(--font-body);
+          font-size: 0.9rem;
+          font-weight: 500;
+          transition: all 0.15s ease;
+          text-align: left;
+          background: var(--surface);
+          color: var(--text);
+        }
+
+        .term-btn:disabled {
+          opacity: 0.35;
           cursor: not-allowed;
         }
 
-        .btn-primary {
-          border-color: #0ffe00;
-          color: #0ffe00;
+        .term-btn-primary {
+          background: var(--primary);
+          border-color: var(--primary);
+          color: white;
+          font-weight: 600;
         }
 
-        .btn-primary:hover:not(:disabled) {
-          background: rgba(15, 254, 0, 0.2);
-          box-shadow: 0 0 10px rgba(15, 254, 0, 0.3);
+        .term-btn-primary:hover:not(:disabled) {
+          background: var(--primary-hover);
+          box-shadow: 0 2px 8px rgba(212,96,58,0.25);
         }
 
-        .btn-call, .btn-start, .btn-finish {
-          border-color: #00d4ff;
-          color: #00d4ff;
+        .term-btn-default:hover:not(:disabled) {
+          background: var(--surface-warm);
+          border-color: var(--text-light);
         }
 
-        .btn-call:hover:not(:disabled),
-        .btn-start:hover:not(:disabled),
-        .btn-finish:hover:not(:disabled) {
-          background: rgba(0, 212, 255, 0.2);
-          box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+        .term-btn-success {
+          background: var(--secondary);
+          border-color: var(--secondary);
+          color: white;
         }
 
-        .btn-recall {
-          border-color: #ffa500;
-          color: #ffa500;
+        .term-btn-success:hover:not(:disabled) {
+          background: #4e7a51;
         }
 
-        .btn-recall:hover:not(:disabled) {
-          background: rgba(255, 165, 0, 0.2);
-          box-shadow: 0 0 10px rgba(255, 165, 0, 0.3);
+        .term-btn-outline {
+          background: transparent;
+          border-color: var(--border);
+          color: var(--text-muted);
         }
 
-        .btn-noshow {
-          border-color: #ff3333;
-          color: #ff3333;
+        .term-btn-outline:hover:not(:disabled) {
+          border-color: var(--accent);
+          color: var(--accent);
+          background: var(--accent-light);
         }
 
-        .btn-noshow:hover:not(:disabled) {
-          background: rgba(255, 51, 51, 0.2);
-          box-shadow: 0 0 10px rgba(255, 51, 51, 0.3);
+        .term-btn-danger {
+          background: transparent;
+          border-color: var(--border);
+          color: var(--danger);
         }
 
-        /* Main Area */
-        .main-area {
-          grid-column: 2;
-          grid-row: 2;
+        .term-btn-danger:hover:not(:disabled) {
+          background: var(--danger-light);
+          border-color: var(--danger);
+        }
+
+        /* Main */
+        .term-main {
           display: grid;
-          grid-template-columns: 1fr 350px;
-          gap: 2rem;
-          padding: 2rem;
+          grid-template-columns: 1fr 320px;
+          gap: 1.5rem;
+          padding: 1.5rem;
           overflow: hidden;
         }
 
-        /* Current Turn */
-        .current-turn-display {
-          background: linear-gradient(135deg, rgba(15, 254, 0, 0.05), rgba(0, 212, 255, 0.05));
-          border: 3px solid #0ffe00;
-          border-radius: 0;
-          padding: 3rem;
+        /* Current turn */
+        .term-current {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 1.5rem;
-          position: relative;
-          overflow: hidden;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          padding: 3rem;
+          gap: 1rem;
         }
 
-        .current-turn-display::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: radial-gradient(circle at 50% 50%, rgba(15, 254, 0, 0.1), transparent);
-          pointer-events: none;
-        }
-
-        .turn-header {
-          font-size: 1rem;
-          font-weight: 700;
-          letter-spacing: 2px;
-          color: #0ffe00;
+        .term-current-label {
+          font-size: 0.8rem;
+          font-weight: 600;
           text-transform: uppercase;
-          position: relative;
-          z-index: 1;
+          letter-spacing: 0.12em;
+          color: var(--text-muted);
         }
 
-        .turn-number {
-          font-family: 'Space Mono', monospace;
-          font-size: 12rem;
-          font-weight: 700;
-          line-height: 0.9;
-          color: #0ffe00;
-          text-shadow: 0 0 20px rgba(15, 254, 0, 0.5);
-          position: relative;
-          z-index: 1;
-          animation: pulse-number 2s ease-in-out infinite;
+        .term-current-number {
+          font-family: var(--font-display);
+          font-size: 10rem;
+          font-weight: 900;
+          line-height: 1;
+          color: var(--primary);
         }
 
-        @keyframes pulse-number {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.7; }
+        .term-status-pill {
+          display: inline-block;
+          padding: 0.35rem 1rem;
+          border-radius: 999px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          text-transform: capitalize;
         }
 
-        .turn-status-badge {
-          font-size: 1rem;
-          font-weight: 700;
-          padding: 0.5rem 1rem;
-          border: 2px solid #00d4ff;
-          color: #00d4ff;
-          letter-spacing: 1px;
-          position: relative;
-          z-index: 1;
+        .term-status-waiting { background: var(--accent-light); color: var(--accent); }
+        .term-status-called { background: var(--primary-light); color: var(--primary); }
+        .term-status-attending { background: var(--secondary-light); color: var(--secondary); }
+
+        .term-recall-badge {
+          font-size: 0.8rem;
+          color: var(--accent);
+          font-weight: 500;
         }
 
-        .turn-meta {
-          font-size: 0.9rem;
-          color: #ffa500;
-          position: relative;
-          z-index: 1;
-        }
-
-        .empty-state {
+        .term-empty {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 1rem;
-          color: #666;
+          gap: 0.5rem;
         }
 
-        .empty-icon {
-          font-size: 6rem;
-          color: #333;
+        .term-empty-icon {
+          font-size: 4rem;
+          color: var(--border);
+          font-family: var(--font-display);
         }
 
-        .empty-text {
-          font-size: 1.1rem;
-          color: #999;
+        .term-empty-text {
+          color: var(--text-light);
+          font-size: 0.95rem;
         }
 
-        /* Waiting Queue */
-        .waiting-queue {
-          background: rgba(15, 254, 0, 0.02);
-          border: 2px solid rgba(15, 254, 0, 0.2);
-          border-radius: 0;
-          padding: 1.5rem;
+        /* Queue */
+        .term-queue {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          padding: 1.25rem;
           display: flex;
           flex-direction: column;
-          gap: 1rem;
           overflow: hidden;
         }
 
-        .queue-header {
-          font-size: 0.9rem;
-          font-weight: 700;
-          letter-spacing: 1px;
-          color: #0ffe00;
+        .term-queue-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: var(--text-muted);
           text-transform: uppercase;
+          letter-spacing: 0.08em;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid var(--border-light);
+          margin-bottom: 0.75rem;
         }
 
-        .queue-list {
+        .term-queue-count {
+          background: var(--surface-warm);
+          color: var(--text-muted);
+          padding: 0.2rem 0.6rem;
+          border-radius: 999px;
+          font-size: 0.8rem;
+          font-weight: 600;
+        }
+
+        .term-queue-list {
           flex: 1;
           overflow-y: auto;
           display: flex;
           flex-direction: column;
-          gap: 0.5rem;
+          gap: 0.375rem;
         }
 
-        .queue-item {
+        .term-queue-item {
           display: grid;
-          grid-template-columns: 60px 1fr auto;
-          gap: 0.8rem;
+          grid-template-columns: 50px 1fr auto;
+          gap: 0.75rem;
           align-items: center;
-          padding: 0.8rem;
-          background: rgba(15, 254, 0, 0.08);
-          border-left: 3px solid #00d4ff;
-          animation: slide-in-item 0.4s ease-out forwards;
+          padding: 0.7rem 0.75rem;
+          background: var(--surface-warm);
+          border-radius: var(--radius-sm);
+          animation: item-in 0.3s ease-out forwards;
           opacity: 0;
         }
 
-        @keyframes slide-in-item {
-          from {
-            opacity: 0;
-            transform: translateX(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+        @keyframes item-in {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
         }
 
-        .queue-number {
-          font-family: 'Space Mono', monospace;
-          font-size: 1.5rem;
+        .term-queue-num {
+          font-family: var(--font-display);
+          font-size: 1.3rem;
           font-weight: 700;
-          color: #0ffe00;
+          color: var(--primary);
         }
 
-        .queue-time {
+        .term-queue-time {
           font-size: 0.8rem;
-          color: #999;
+          color: var(--text-light);
+          font-variant-numeric: tabular-nums;
         }
 
-        .queue-requeue {
+        .term-queue-r {
           font-size: 0.7rem;
-          padding: 0.3rem 0.6rem;
-          background: #ffa500;
-          color: #000;
-          border-radius: 2px;
           font-weight: 600;
+          color: var(--accent);
+          background: var(--accent-light);
+          padding: 0.15rem 0.5rem;
+          border-radius: 999px;
         }
 
-        .queue-empty {
-          padding: 2rem;
+        .term-queue-empty {
           text-align: center;
-          color: #666;
+          padding: 2rem;
+          color: var(--text-light);
           font-size: 0.9rem;
         }
 
-        /* Message */
-        .message {
+        .term-queue-list::-webkit-scrollbar { width: 4px; }
+        .term-queue-list::-webkit-scrollbar-track { background: transparent; }
+        .term-queue-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        /* Toast */
+        .term-toast {
           position: fixed;
-          bottom: 2rem;
+          bottom: 1.5rem;
           left: 50%;
           transform: translateX(-50%);
-          padding: 1rem 2rem;
-          border-radius: 0;
+          padding: 0.75rem 1.5rem;
+          border-radius: var(--radius);
           font-weight: 600;
-          letter-spacing: 0.5px;
+          font-size: 0.9rem;
           z-index: 100;
-          animation: slide-up 0.3s ease-out;
+          animation: toast-in 0.3s ease-out;
+          box-shadow: var(--shadow-lg);
         }
 
-        @keyframes slide-up {
-          from {
-            opacity: 0;
-            transform: translate(-50%, 20px);
+        @keyframes toast-in {
+          from { opacity: 0; transform: translate(-50%, 12px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
+        .term-toast-success {
+          background: var(--secondary);
+          color: white;
+        }
+
+        .term-toast-error {
+          background: var(--danger);
+          color: white;
+        }
+
+        @media (max-width: 900px) {
+          .term {
+            grid-template-columns: 1fr;
           }
-          to {
-            opacity: 1;
-            transform: translate(-50%, 0);
+          .term-sidebar {
+            border-right: none;
+            border-bottom: 1px solid var(--border);
           }
-        }
-
-        .message-success {
-          background: #0ffe00;
-          color: #000;
-        }
-
-        .message-error {
-          background: #ff3333;
-          color: #fff;
-        }
-
-        /* Scrollbar */
-        .queue-list::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        .queue-list::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        .queue-list::-webkit-scrollbar-thumb {
-          background: rgba(15, 254, 0, 0.3);
+          .term-main {
+            grid-template-columns: 1fr;
+          }
+          .term-current-number {
+            font-size: 6rem;
+          }
         }
       `}</style>
     </div>
