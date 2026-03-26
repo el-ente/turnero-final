@@ -12,7 +12,9 @@ import {
 
 // Initialize Firebase (will use emulator if FIRESTORE_EMULATOR_HOST is set)
 if (!admin.apps.length) {
-  admin.initializeApp();
+  admin.initializeApp({
+    projectId: process.env.FIREBASE_PROJECT_ID || "turnero-60150",
+  });
 }
 
 const db = admin.firestore();
