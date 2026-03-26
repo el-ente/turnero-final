@@ -1,40 +1,45 @@
 # Turnero
 
-## Setup
+Appointment queue management system. Stack: React + Vite, Firebase (Hosting, Firestore, Functions).
 
-```bash
-cp app/.env.local.example app/.env.local  # completar con los valores de Firebase
+## Requirements
+
+- Node 24
+- pnpm
+- Firebase CLI (`npm i -g firebase-tools`)
+
+## Environment variables
+
+Create `app/.env.local` with your Firebase project values:
+
+```
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
 ```
 
-## Desarrollo local
+## Development
 
-**UI** (http://localhost:5173):
-```bash
-cd app
-pnpm install
-pnpm dev
-```
+Run each service in a separate terminal:
 
-**Emuladores de Firebase** (Firestore, Functions, etc.):
 ```bash
+# UI
+cd app && pnpm install && pnpm dev
+
+# Firebase emulators (Firestore, Functions, etc.)
 firebase emulators:start
-```
 
-**Functions** (watch mode):
-```bash
-cd functions
-npm install
-npm run build:watch
+# Functions watch mode
+cd functions && npm install && npm run build:watch
 ```
-
-> Para que la UI use los emuladores, configurar el SDK de Firebase para apuntar a `localhost`.
 
 ## Deploy
 
-El deploy se ejecuta automáticamente al mergear a `main` via GitHub Actions.
-Deploya: hosting, functions, reglas de Firestore y Storage.
+Runs automatically on merge to `main`. To deploy manually:
 
-Para deployar manualmente:
 ```bash
 firebase deploy
 ```
