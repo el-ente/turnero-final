@@ -1,10 +1,3 @@
-body {
-  font-family: system-ui, -apple-system, sans-serif;
-  margin: 0;
-  padding: 0;
-  background: #f5f5f5;
-}
-
 .app {
   min-height: 100vh;
   display: flex;
@@ -12,158 +5,49 @@ body {
 }
 
 .navbar {
-  background: #0066cc;
-  color: white;
-  padding: 1rem 2rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  height: 64px;
+  box-shadow: var(--shadow-xs);
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 
 .navbar h1 {
-  margin: 0;
-  font-size: 1.5rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.02em;
 }
 
 .nav-links {
   list-style: none;
   display: flex;
-  gap: 2rem;
-  margin: 0;
-  padding: 0;
+  gap: 0.25rem;
 }
 
 .nav-links a {
-  color: white;
+  color: var(--text-muted);
   text-decoration: none;
-  transition: opacity 0.2s;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
 }
 
 .nav-links a:hover {
-  opacity: 0.8;
+  color: var(--text);
+  background: var(--surface-warm);
 }
 
-main {
-  flex: 1;
-  padding: 2rem;
-}
-
-.placeholder {
-  padding: 2rem;
-  background: white;
-  border-radius: 8px;
-  text-align: center;
-  color: #666;
-  margin: 2rem auto;
-  max-width: 600px;
-}
-
-/* Totem specific styles */
-.totem-container {
-  padding: 2rem;
-  max-width: 600px;
-  margin: 0 auto;
-  text-align: center;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.totem-section {
-  margin: 2rem 0;
-}
-
-.queue-selector {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-  margin: 1rem 0;
-}
-
-.queue-button {
-  padding: 1rem;
-  font-size: 1rem;
-  border: 2px solid #ccc;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: white;
-}
-
-.queue-button:hover {
-  border-color: #0066cc;
-  background: #f0f8ff;
-}
-
-.queue-button.selected {
-  border-color: #0066cc;
-  background: #0066cc;
-  color: white;
-}
-
-.primary-button {
-  padding: 1rem 2rem;
-  font-size: 1.1rem;
-  background: #0066cc;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.primary-button:hover:not(:disabled) {
-  background: #0052a3;
-}
-
-.primary-button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.error {
-  color: #d32f2f;
-  padding: 1rem;
-  background: #ffebee;
-  border-radius: 4px;
-  margin: 1rem 0;
-}
-
-.turn-display {
-  background: #f5f5f5;
-  padding: 2rem;
-  border-radius: 8px;
-  margin: 2rem 0;
-}
-
-.turn-number {
-  font-size: 4rem;
-  font-weight: bold;
-  color: #0066cc;
-  margin: 1rem 0;
-}
-
-.turn-queue {
-  font-size: 1.5rem;
-  color: #333;
-  margin: 1rem 0;
-}
-
-.turn-status {
-  font-size: 1.2rem;
-  color: #666;
-  margin-top: 1rem;
-}
-
-.turn-info {
-  font-size: 0.9rem;
-  color: #666;
-  margin: 1rem 0;
-}
-
-.info-text {
-  font-size: 0.8rem;
-  color: #999;
-  margin-top: 2rem;
+.nav-links a.active {
+  color: var(--primary);
+  background: var(--primary-light);
 }
