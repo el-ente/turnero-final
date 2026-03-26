@@ -46,46 +46,48 @@ export async function callFunction<T>(
   return (await response.json()) as T;
 }
 
+import type { Turn } from "shared";
+
 // Turn API
 export async function createTurn(
   queueId: string,
   memberId: string,
   channel: "totem" | "whatsapp" | "mobile" = "totem"
-) {
-  return callFunction("createTurn", "POST", {
+): Promise<Turn> {
+  return callFunction<Turn>("createTurn", "POST", {
     queueId,
     memberId,
     channel,
   });
 }
 
-export async function getCurrentTurn(memberId: string) {
-  return callFunction("getCurrentTurn", "GET", undefined, { memberId });
+export async function getCurrentTurn(memberId: string): Promise<Turn> {
+  return callFunction<Turn>("getCurrentTurn", "GET", undefined, { memberId });
 }
 
 // Terminal API
-export async function getNextTurn(terminalId: string) {
-  return callFunction("nextTurn", "POST", { terminalId });
+export async function getNextTurn(terminalId: string): Promise<Turn | null> {
+  return callFunction<Turn | null>("nextTurn", "POST", { terminalId });
 }
 
-export async function callTurn(terminalId: string, turnId: string) {
-  return callFunction("callTurn", "POST", { terminalId, turnId });
+export async function callTurn(terminalId: string, turnId: string): Promise<void> {
+  return callFunction<void>("callTurn", "POST", { terminalId, turnId });
 }
 
-export async function startTurn(terminalId: string, turnId: string) {
-  return callFunction("startTurn", "POST", { terminalId, turnId });
+export async function startTurn(terminalId: string, turnId: string): Promise<void> {
+  return callFunction<void>("startTurn", "POST", { terminalId, turnId });
 }
 
-export async function finishTurn(terminalId: string, turnId: string) {
-  return callFunction("finishTurn", "POST", { terminalId, turnId });
+export async function finishTurn(terminalId: string, turnId: string): Promise<void> {
+  return callFunction<void>("finishTurn", "POST", { terminalId, turnId });
 }
 
-export async function recallTurn(terminalId: string, turnId: string) {
-  return callFunction("recallTurn", "POST", { terminalId, turnId });
+export async function recallTurn(terminalId: string, turnId: string): Promise<void> {
+  return callFunction<void>("recallTurn", "POST", { terminalId, turnId });
 }
 
-export async function noShowTurn(terminalId: string, turnId: string) {
-  return callFunction("noShow", "POST", { terminalId, turnId });
+export async function noShowTurn(terminalId: string, turnId: string): Promise<void> {
+  return callFunction<void>("noShow", "POST", { terminalId, turnId });
 }
 
 // Admin API
