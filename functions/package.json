@@ -9,7 +9,7 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "seed:emulator": "npm run build && FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 node lib/seed.js"
+    "seed:emulator": "npm run build && FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 node lib/functions/src/seed.js"
   },
   "engines": {
     "node": "24"
