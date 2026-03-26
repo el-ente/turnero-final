@@ -23,7 +23,13 @@ VITE_FIREBASE_APP_ID=
 
 ## Development
 
-Run each service in a separate terminal:
+Start everything with one command:
+
+```bash
+pnpm dev
+```
+
+Or run each service in a separate terminal:
 
 ```bash
 # UI
