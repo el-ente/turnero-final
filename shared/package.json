@@ -1,13 +1,18 @@
 {
   "name": "shared",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Shared types and models",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "build:watch": "tsc --watch"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.33.0"
+  "packageManager": "pnpm@10.33.0",
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
 }
