@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
+import { useParams, Navigate } from "react-router-dom";
 import type { Turn, Terminal } from "shared";
 import { db } from "../lib/firebase";
-import { doc, getDoc, collection, query, where, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, where } from "firebase/firestore";
 import {
   getNextTurn,
   callTurn,
@@ -12,9 +13,10 @@ import {
 } from "../lib/api";
 import { toDate } from "../lib/dates";
 
-const TERMINAL_ID = "terminal-1";
-
 export function TerminalView() {
+  const { terminalId } = useParams<{ terminalId: string }>();
+
+  if (!terminalId) return <Navigate to="/terminal" replace />;
   const [terminal, setTerminal] = useState<Terminal | null>(null);
   const [currentTurn, setCurrentTurn] = useState<Turn | null>(null);
   const [waitingTurns, setWaitingTurns] = useState<Turn[]>([]);
@@ -22,18 +24,13 @@ export function TerminalView() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
-    const loadTerminal = async () => {
-      try {
-        const terminalDoc = await getDoc(doc(db, "terminals", TERMINAL_ID));
-        if (terminalDoc.exists()) {
-          setTerminal(terminalDoc.data() as Terminal);
-        }
-      } catch (err) {
-        console.error("Error loading terminal:", err);
+    const unsubscribe = onSnapshot(doc(db, "terminals", terminalId), (snap) => {
+      if (snap.exists()) {
+        setTerminal(snap.data() as Terminal);
       }
-    };
-    loadTerminal();
-  }, []);
+    });
+    return unsubscribe;
+  }, [terminalId]);
 
   useEffect(() => {
     if (!terminal) return;
@@ -59,20 +56,14 @@ export function TerminalView() {
       setCurrentTurn(null);
       return;
     }
-    const loadCurrentTurn = async () => {
-      try {
-        const turnDoc = await getDoc(doc(db, "turns", terminal.currentTurnId!));
-        if (turnDoc.exists()) {
-          setCurrentTurn(turnDoc.data() as Turn);
-        } else {
-          setCurrentTurn(null);
-        }
-      } catch (err) {
-        console.error("Error loading current turn:", err);
+    const unsubscribe = onSnapshot(doc(db, "turns", terminal.currentTurnId), (snap) => {
+      if (snap.exists()) {
+        setCurrentTurn(snap.data() as Turn);
+      } else {
         setCurrentTurn(null);
       }
-    };
-    loadCurrentTurn();
+    });
+    return unsubscribe;
   }, [terminal?.currentTurnId]);
 
   const showMessage = (type: "success" | "error", text: string) => {
@@ -83,7 +74,7 @@ export function TerminalView() {
   const handleNextTurn = async () => {
     setLoading(true);
     try {
-      const turn = await getNextTurn(TERMINAL_ID);
+      const turn = await getNextTurn(terminalId);
       if (turn) {
         setCurrentTurn(turn);
         showMessage("success", `Turno ${turn.currentTurnNumber} seleccionado`);
@@ -101,7 +92,7 @@ export function TerminalView() {
     if (!currentTurn) return;
     setLoading(true);
     try {
-      await callTurn(TERMINAL_ID, currentTurn.id);
+      await callTurn(terminalId, currentTurn.id);
       showMessage("success", `Turno ${currentTurn.currentTurnNumber} llamado`);
     } catch (err) {
       showMessage("error", err instanceof Error ? err.message : "Error");
@@ -114,7 +105,7 @@ export function TerminalView() {
     if (!currentTurn) return;
     setLoading(true);
     try {
-      await startTurn(TERMINAL_ID, currentTurn.id);
+      await startTurn(terminalId, currentTurn.id);
       showMessage("success", "Atencion iniciada");
     } catch (err) {
       showMessage("error", err instanceof Error ? err.message : "Error");
@@ -127,7 +118,7 @@ export function TerminalView() {
     if (!currentTurn) return;
     setLoading(true);
     try {
-      await finishTurn(TERMINAL_ID, currentTurn.id);
+      await finishTurn(terminalId, currentTurn.id);
       setCurrentTurn(null);
       showMessage("success", "Turno finalizado");
     } catch (err) {
@@ -141,7 +132,7 @@ export function TerminalView() {
     if (!currentTurn) return;
     setLoading(true);
     try {
-      await noShowTurn(TERMINAL_ID, currentTurn.id);
+      await noShowTurn(terminalId, currentTurn.id);
       setCurrentTurn(null);
       showMessage("success", "Turno marcado como no presentado");
     } catch (err) {
@@ -155,7 +146,7 @@ export function TerminalView() {
     if (!currentTurn) return;
     setLoading(true);
     try {
-      await recallTurn(TERMINAL_ID, currentTurn.id);
+      await recallTurn(terminalId, currentTurn.id);
       showMessage("success", "Turno re-llamado");
     } catch (err) {
       showMessage("error", err instanceof Error ? err.message : "Error");
@@ -171,8 +162,8 @@ export function TerminalView() {
         <div className="term-identity">
           <div className="term-id-dot"></div>
           <div>
-            <div className="term-id-name">{TERMINAL_ID}</div>
-            <div className="term-id-status">En linea</div>
+            <div className="term-id-name">{terminal?.name || terminalId}</div>
+            <div className="term-id-status">{terminal?.status === "offline" ? "Desconectado" : "En línea"}</div>
           </div>
         </div>
 
