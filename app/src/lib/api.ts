@@ -13,7 +13,7 @@ export interface ApiError {
 
 export async function callFunction<T>(
   functionName: string,
-  method: "GET" | "POST" | "PUT" = "POST",
+  method: "GET" | "POST" | "PUT" | "DELETE" = "POST",
   body?: unknown,
   queryParams?: Record<string, string>
 ): Promise<T> {
@@ -43,10 +43,12 @@ export async function callFunction<T>(
     throw new Error(error.error || `API error: ${response.statusText}`);
   }
 
+  if (response.status === 204) return undefined as T;
+
   return (await response.json()) as T;
 }
 
-import type { Turn } from "shared";
+import type { Turn, Sector, Queue, Terminal } from "shared";
 
 // Turn API
 export async function createTurn(
@@ -97,4 +99,55 @@ export async function getQueueStats(queueId: string) {
 
 export async function updateQueueConfig(queueId: string, config: any) {
   return callFunction("updateQueueConfig", "PUT", config, { queueId });
+}
+
+// CRUD — Sectors
+export async function apiCreateSector(data: { name: string; description?: string }) {
+  return callFunction<Sector>("createSector", "POST", data);
+}
+
+export async function apiListSectors() {
+  return callFunction<Sector[]>("listSectors", "GET");
+}
+
+export async function apiUpdateSector(sectorId: string, data: Partial<Sector>) {
+  return callFunction<Sector>("updateSector", "PUT", data, { sectorId });
+}
+
+export async function apiDeleteSector(sectorId: string) {
+  return callFunction<void>("deleteSector", "DELETE", undefined, { sectorId });
+}
+
+// CRUD — Queues
+export async function apiCreateQueue(data: { name: string; sectorId: string; type: string; reenqueueConfig: any; priorityWeight?: number }) {
+  return callFunction<Queue>("createQueue", "POST", data);
+}
+
+export async function apiListQueues() {
+  return callFunction<Queue[]>("listQueues", "GET");
+}
+
+export async function apiUpdateQueue(queueId: string, data: Partial<Queue>) {
+  return callFunction<Queue>("updateQueue", "PUT", data, { queueId });
+}
+
+export async function apiDeleteQueue(queueId: string) {
+  return callFunction<void>("deleteQueue", "DELETE", undefined, { queueId });
+}
+
+// CRUD — Terminals
+export async function apiCreateTerminal(data: { name: string; sectorIds: string[]; activeQueueIds: string[]; servingStrategy: string; strategyConfig: any }) {
+  return callFunction<Terminal>("createTerminal", "POST", data);
+}
+
+export async function apiListTerminals() {
+  return callFunction<Terminal[]>("listTerminals", "GET");
+}
+
+export async function apiUpdateTerminal(terminalId: string, data: Partial<Terminal>) {
+  return callFunction<Terminal>("updateTerminal", "PUT", data, { terminalId });
+}
+
+export async function apiDeleteTerminal(terminalId: string) {
+  return callFunction<void>("deleteTerminal", "DELETE", undefined, { terminalId });
 }
