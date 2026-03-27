@@ -11,7 +11,7 @@ export function PublicDisplay() {
   useEffect(() => {
     const q = query(
       collection(db, "turns"),
-      where("status", "==", "called"),
+      where("status", "in", ["called", "attending"]),
       orderBy("calledAt", "desc")
     );
 
