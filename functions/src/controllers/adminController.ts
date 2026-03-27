@@ -1,72 +1,170 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { getQueueStats } from "../services/statsService";
+import {
+  createSector, listSectors, updateSector, deleteSector,
+  createQueue, listQueues, updateQueue, deleteQueue,
+  createTerminal, listTerminals, updateTerminal, deleteTerminal,
+} from "../services/adminService";
 import { BusinessError } from "../utils/errors";
-import { db, logger } from "../config/firebase-admin";
+import { logger } from "../config/firebase-admin";
+
+function handleError(res: any, error: unknown) {
+  if (error instanceof BusinessError) {
+    res.status(error.statusCode).json({ error: error.message, code: error.code });
+  } else {
+    logger.error("Internal error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+// ─── Stats (existing) ───
 
 export const getQueueStatsHandler = onRequest({ cors: true }, async (req, res) => {
   try {
-    if (req.method !== "GET") {
-      res.status(405).json({ error: "Method not allowed" });
-      return;
-    }
-
+    if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
     const { queueId } = req.query;
     if (!queueId || typeof queueId !== "string") {
-      res.status(400).json({ error: "queueId query parameter is required" });
-      return;
+      res.status(400).json({ error: "queueId query parameter is required" }); return;
     }
-
     const stats = await getQueueStats(queueId);
     res.status(200).json(stats);
-  } catch (error) {
-    if (error instanceof BusinessError) {
-      res.status(error.statusCode).json({ error: error.message, code: error.code });
-    } else {
-      logger.error("Error getting queue stats:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  }
+  } catch (error) { handleError(res, error); }
 });
 
 export const updateQueueConfigHandler = onRequest({ cors: true }, async (req, res) => {
   try {
-    if (req.method !== "PUT") {
-      res.status(405).json({ error: "Method not allowed" });
-      return;
-    }
-
+    if (req.method !== "PUT") { res.status(405).json({ error: "Method not allowed" }); return; }
     const { queueId } = req.query;
     if (!queueId || typeof queueId !== "string") {
-      res.status(400).json({ error: "queueId query parameter is required" });
-      return;
+      res.status(400).json({ error: "queueId query parameter is required" }); return;
     }
+    const result = await updateQueue(queueId, req.body);
+    res.status(200).json(result);
+  } catch (error) { handleError(res, error); }
+});
 
-    const { name, type, reenqueueConfig, priorityWeight } = req.body;
+// ─── Sectors ───
 
-    // Verify queue exists
-    const queueDoc = await db.collection("queues").doc(queueId).get();
-    if (!queueDoc.exists) {
-      res.status(404).json({ error: "Queue not found" });
-      return;
+export const createSectorHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const result = await createSector(req.body);
+    res.status(201).json(result);
+  } catch (error) { handleError(res, error); }
+});
+
+export const listSectorsHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const result = await listSectors();
+    res.status(200).json(result);
+  } catch (error) { handleError(res, error); }
+});
+
+export const updateSectorHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "PUT") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const { sectorId } = req.query;
+    if (!sectorId || typeof sectorId !== "string") {
+      res.status(400).json({ error: "sectorId query parameter is required" }); return;
     }
+    const result = await updateSector(sectorId, req.body);
+    res.status(200).json(result);
+  } catch (error) { handleError(res, error); }
+});
 
-    const updateData: any = {};
-    if (name !== undefined) updateData.name = name;
-    if (type !== undefined) updateData.type = type;
-    if (reenqueueConfig !== undefined) updateData.reenqueueConfig = reenqueueConfig;
-    if (priorityWeight !== undefined) updateData.priorityWeight = priorityWeight;
-    updateData.updatedAt = new Date();
-
-    await db.collection("queues").doc(queueId).update(updateData);
-
-    const updatedDoc = await db.collection("queues").doc(queueId).get();
-    res.status(200).json(updatedDoc.data());
-  } catch (error) {
-    if (error instanceof BusinessError) {
-      res.status(error.statusCode).json({ error: error.message, code: error.code });
-    } else {
-      logger.error("Error updating queue config:", error);
-      res.status(500).json({ error: "Internal server error" });
+export const deleteSectorHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "DELETE") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const { sectorId } = req.query;
+    if (!sectorId || typeof sectorId !== "string") {
+      res.status(400).json({ error: "sectorId query parameter is required" }); return;
     }
-  }
+    await deleteSector(sectorId);
+    res.status(204).send();
+  } catch (error) { handleError(res, error); }
+});
+
+// ─── Queues ───
+
+export const createQueueHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const result = await createQueue(req.body);
+    res.status(201).json(result);
+  } catch (error) { handleError(res, error); }
+});
+
+export const listQueuesHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const result = await listQueues();
+    res.status(200).json(result);
+  } catch (error) { handleError(res, error); }
+});
+
+export const updateQueueHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "PUT") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const { queueId } = req.query;
+    if (!queueId || typeof queueId !== "string") {
+      res.status(400).json({ error: "queueId query parameter is required" }); return;
+    }
+    const result = await updateQueue(queueId, req.body);
+    res.status(200).json(result);
+  } catch (error) { handleError(res, error); }
+});
+
+export const deleteQueueHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "DELETE") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const { queueId } = req.query;
+    if (!queueId || typeof queueId !== "string") {
+      res.status(400).json({ error: "queueId query parameter is required" }); return;
+    }
+    await deleteQueue(queueId);
+    res.status(204).send();
+  } catch (error) { handleError(res, error); }
+});
+
+// ─── Terminals ───
+
+export const createTerminalHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const result = await createTerminal(req.body);
+    res.status(201).json(result);
+  } catch (error) { handleError(res, error); }
+});
+
+export const listTerminalsHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const result = await listTerminals();
+    res.status(200).json(result);
+  } catch (error) { handleError(res, error); }
+});
+
+export const updateTerminalHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "PUT") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const { terminalId } = req.query;
+    if (!terminalId || typeof terminalId !== "string") {
+      res.status(400).json({ error: "terminalId query parameter is required" }); return;
+    }
+    const result = await updateTerminal(terminalId, req.body);
+    res.status(200).json(result);
+  } catch (error) { handleError(res, error); }
+});
+
+export const deleteTerminalHandler = onRequest({ cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "DELETE") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const { terminalId } = req.query;
+    if (!terminalId || typeof terminalId !== "string") {
+      res.status(400).json({ error: "terminalId query parameter is required" }); return;
+    }
+    await deleteTerminal(terminalId);
+    res.status(204).send();
+  } catch (error) { handleError(res, error); }
 });

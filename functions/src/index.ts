@@ -8,7 +8,12 @@ import {
   recallTurnHandler,
   noShowHandler,
 } from "./controllers/terminalController";
-import { getQueueStatsHandler, updateQueueConfigHandler } from "./controllers/adminController";
+import {
+  getQueueStatsHandler, updateQueueConfigHandler,
+  createSectorHandler, listSectorsHandler, updateSectorHandler, deleteSectorHandler,
+  createQueueHandler, listQueuesHandler, updateQueueHandler, deleteQueueHandler,
+  createTerminalHandler, listTerminalsHandler, updateTerminalHandler, deleteTerminalHandler,
+} from "./controllers/adminController";
 
 setGlobalOptions({ maxInstances: 10 });
 
@@ -27,3 +32,21 @@ export const noShow = noShowHandler;
 // Admin endpoints
 export const getQueueStats = getQueueStatsHandler;
 export const updateQueueConfig = updateQueueConfigHandler;
+
+// CRUD — Sectors
+export const createSector = createSectorHandler;
+export const listSectors = listSectorsHandler;
+export const updateSector = updateSectorHandler;
+export const deleteSector = deleteSectorHandler;
+
+// CRUD — Queues
+export const createQueue = createQueueHandler;
+export const listQueues = listQueuesHandler;
+export const updateQueue = updateQueueHandler;
+export const deleteQueue = deleteQueueHandler;
+
+// CRUD — Terminals
+export const createTerminal = createTerminalHandler;
+export const listTerminals = listTerminalsHandler;
+export const updateTerminal = updateTerminalHandler;
+export const deleteTerminal = deleteTerminalHandler;
