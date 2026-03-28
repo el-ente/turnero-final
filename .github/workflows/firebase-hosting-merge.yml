@@ -14,12 +14,12 @@ jobs:
           node-version: "24"
       - name: Install pnpm
         run: corepack enable && corepack prepare pnpm@latest --activate
-      - name: Install app dependencies
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        working-directory: ./app
+      - name: Build shared
+        run: pnpm -F shared build
       - name: Build app
-        run: pnpm run build
-        working-directory: ./app
+        run: pnpm -F app build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -27,9 +27,8 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-      - name: Install functions dependencies
-        run: npm install
-        working-directory: ./functions
+      - name: Build functions
+        run: pnpm -F functions build
       - name: Setup Firebase credentials
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_TURNERO_60150 }}' > /tmp/service-account.json
       - name: Deploy to Firebase
