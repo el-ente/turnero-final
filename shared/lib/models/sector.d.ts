@@ -1,8 +1,0 @@
-export interface Sector {
-    id: string;
-    name: string;
-    description?: string;
-    createdAt: Date;
-    updatedAt: Date;
-}
-//# sourceMappingURL=sector.d.ts.map
