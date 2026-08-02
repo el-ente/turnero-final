@@ -1,8 +1,8 @@
-import { Turn, TurnStatus, Terminal, ServingStrategy } from "shared";
-import { db } from "../config/firebase-admin";
-import { NotFoundError, ConflictError } from "../utils/errors";
-import { getWaitingTurnsAcrossQueues } from "./queueService";
-import { updateTurnStatus, noShowTurn } from "./turnService";
+import {Turn, TurnStatus, Terminal, ServingStrategy} from "shared";
+import {db} from "../config/firebase-admin";
+import {NotFoundError, ConflictError} from "../utils/errors";
+import {getWaitingTurnsAcrossQueues} from "./queueService";
+import {updateTurnStatus, noShowTurn} from "./turnService";
 
 export async function getNextTurn(terminalId: string): Promise<Turn | null> {
   const terminalDoc = await db.collection("terminals").doc(terminalId).get();
@@ -42,9 +42,9 @@ async function getNextTurnRatioBased(terminal: Terminal): Promise<Turn | null> {
   // If we've served more priority turns than the ratio allows, serve normal
   // If we've served fewer priority turns, serve priority
 
-  const totalNormalRequired = normalCounterState + priorityCounterState > 0
-    ? Math.ceil((normalCounterState + priorityCounterState) * (config.normalQueueRatio / (config.normalQueueRatio + config.priorityQueueRatio)))
-    : 0;
+  const totalNormalRequired = normalCounterState + priorityCounterState > 0 ?
+    Math.ceil((normalCounterState + priorityCounterState) * (config.normalQueueRatio / (config.normalQueueRatio + config.priorityQueueRatio))) :
+    0;
 
   const shouldServePriority = normalCounterState >= totalNormalRequired && priorityCounterState <= Math.floor((normalCounterState + priorityCounterState) * (config.priorityQueueRatio / (config.normalQueueRatio + config.priorityQueueRatio)));
 
@@ -156,7 +156,7 @@ export async function finishTurn(terminalId: string, turnId: string): Promise<vo
     const terminal = (await transaction.get(db.collection("terminals").doc(terminalId))).data() as Terminal;
     if (terminal.servingStrategy === ServingStrategy.RATIO_BASED && terminal.strategyConfig.ratioBased) {
       const queue = (await transaction.get(db.collection("queues").doc(turn.queueId))).data() as any;
-      const config = { ...terminal.strategyConfig.ratioBased };
+      const config = {...terminal.strategyConfig.ratioBased};
 
       if (queue.type === "priority") {
         config.priorityCounterState = (config.priorityCounterState || 0) + 1;
@@ -165,7 +165,7 @@ export async function finishTurn(terminalId: string, turnId: string): Promise<vo
       }
 
       transaction.update(db.collection("terminals").doc(terminalId), {
-        strategyConfig: { ...terminal.strategyConfig, ratioBased: config },
+        strategyConfig: {...terminal.strategyConfig, ratioBased: config},
         currentTurnId: "",
       });
     } else {

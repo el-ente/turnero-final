@@ -20,6 +20,7 @@ module.exports = {
   ignorePatterns: [
     "/lib/**/*", // Ignore built files.
     "/generated/**/*", // Ignore generated files.
+    "jest.config.js", // Not included in tsconfig, type-aware lint can't parse it.
   ],
   plugins: [
     "@typescript-eslint",
@@ -29,5 +30,7 @@ module.exports = {
     "quotes": ["error", "double"],
     "import/no-unresolved": 0,
     "indent": ["error", 2],
+    "require-jsdoc": "off",
+    "max-len": "warn",
   },
 };

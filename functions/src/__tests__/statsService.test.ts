@@ -1,6 +1,6 @@
-import { getQueueStats } from "../services/statsService";
-import { db } from "../config/firebase-admin";
-import { Turn, TurnStatus } from "shared";
+import {getQueueStats} from "../services/statsService";
+import {db} from "../config/firebase-admin";
+import {Turn, TurnStatus} from "shared";
 
 jest.mock("../config/firebase-admin");
 
@@ -11,7 +11,7 @@ describe("Stats Service", () => {
 
   describe("getQueueStats", () => {
     it("should throw NotFoundError if queue not found", async () => {
-      const mockQueueDoc = { exists: false };
+      const mockQueueDoc = {exists: false};
 
       (db.collection as jest.Mock).mockReturnValue({
         doc: jest.fn().mockReturnValue({
@@ -25,7 +25,7 @@ describe("Stats Service", () => {
     it("should count turns by status", async () => {
       const mockQueueDoc = {
         exists: true,
-        data: () => ({ id: "queue-1", name: "Test Queue" }),
+        data: () => ({id: "queue-1", name: "Test Queue"}),
       };
 
       const mockTurns: Turn[] = [
@@ -96,7 +96,7 @@ describe("Stats Service", () => {
     it("should calculate average wait time correctly", async () => {
       const mockQueueDoc = {
         exists: true,
-        data: () => ({ id: "queue-1" }),
+        data: () => ({id: "queue-1"}),
       };
 
       const createdAt = new Date("2026-03-26T10:00:00");

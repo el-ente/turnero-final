@@ -1,5 +1,5 @@
-import { Turn, TurnStatus } from "shared";
-import { db } from "../config/firebase-admin";
+import {Turn, TurnStatus} from "shared";
+import {db} from "../config/firebase-admin";
 
 export async function getWaitingTurns(queueId: string): Promise<Turn[]> {
   const snapshot = await db

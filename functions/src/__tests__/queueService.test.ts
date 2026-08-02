@@ -1,6 +1,6 @@
-import { getWaitingTurns, getWaitingTurnsAcrossQueues } from "../services/queueService";
-import { db } from "../config/firebase-admin";
-import { TurnStatus } from "shared";
+import {getWaitingTurns, getWaitingTurnsAcrossQueues} from "../services/queueService";
+import {db} from "../config/firebase-admin";
+import {TurnStatus} from "shared";
 
 jest.mock("../config/firebase-admin");
 
@@ -51,7 +51,7 @@ describe("Queue Service", () => {
     });
 
     it("should return empty array if no waiting turns", async () => {
-      const mockSnapshot = { docs: [] };
+      const mockSnapshot = {docs: []};
 
       (db.collection as jest.Mock).mockReturnValue({
         where: jest.fn().mockReturnValue({

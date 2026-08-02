@@ -1,6 +1,6 @@
-import { Turn, TurnStatus } from "shared";
-import { db } from "../config/firebase-admin";
-import { NotFoundError } from "../utils/errors";
+import {Turn, TurnStatus} from "shared";
+import {db} from "../config/firebase-admin";
+import {NotFoundError} from "../utils/errors";
 
 const ARGENTINA_OFFSET = -3 * 60; // UTC-3 in minutes
 
@@ -113,7 +113,7 @@ export async function getTurnById(turnId: string): Promise<Turn | null> {
 }
 
 export async function updateTurnStatus(turnId: string, status: TurnStatus): Promise<void> {
-  const updateData: Partial<Turn> = { status };
+  const updateData: Partial<Turn> = {status};
   if (status === TurnStatus.CALLED) {
     updateData.calledAt = new Date();
   } else if (status === TurnStatus.ATTENDING) {

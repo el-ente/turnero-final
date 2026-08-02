@@ -4,8 +4,8 @@ import {
   requeueTurn,
   noShowTurn,
 } from "../services/turnService";
-import { db } from "../config/firebase-admin";
-import { Turn, TurnStatus } from "shared";
+import {db} from "../config/firebase-admin";
+import {Turn, TurnStatus} from "shared";
 
 // Mock Firestore
 jest.mock("../config/firebase-admin");
@@ -39,7 +39,7 @@ describe("Turn Service", () => {
     });
 
     it("should reject if queue does not exist", async () => {
-      const mockQueueDoc = { exists: false };
+      const mockQueueDoc = {exists: false};
 
       (db.collection as jest.Mock).mockReturnValue({
         doc: jest.fn().mockReturnValue({
@@ -57,7 +57,7 @@ describe("Turn Service", () => {
       const mockQuery = {
         orderBy: jest.fn().mockReturnValue({
           limit: jest.fn().mockReturnValue({
-            get: jest.fn().mockResolvedValue({ empty: true, docs: [] }),
+            get: jest.fn().mockResolvedValue({empty: true, docs: []}),
           }),
         }),
       };
@@ -108,7 +108,7 @@ describe("Turn Service", () => {
     });
 
     it("should throw NotFoundError if turn does not exist", async () => {
-      const mockTurnDoc = { exists: false };
+      const mockTurnDoc = {exists: false};
 
       (db.collection as jest.Mock).mockReturnValue({
         doc: jest.fn().mockReturnValue({

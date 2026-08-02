@@ -1,6 +1,6 @@
-import { Turn, TurnStatus } from "shared";
-import { db } from "../config/firebase-admin";
-import { NotFoundError } from "../utils/errors";
+import {Turn, TurnStatus} from "shared";
+import {db} from "../config/firebase-admin";
+import {NotFoundError} from "../utils/errors";
 
 const ARGENTINA_OFFSET = -3 * 60; // UTC-3 in minutes
 

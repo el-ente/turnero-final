@@ -1,5 +1,5 @@
-import { setGlobalOptions } from "firebase-functions";
-import { createTurnHandler, getCurrentTurnHandler } from "./controllers/turnController";
+import {setGlobalOptions} from "firebase-functions";
+import {createTurnHandler, getCurrentTurnHandler} from "./controllers/turnController";
 import {
   nextTurnHandler,
   callTurnHandler,
@@ -15,7 +15,7 @@ import {
   createTerminalHandler, listTerminalsHandler, updateTerminalHandler, deleteTerminalHandler,
 } from "./controllers/adminController";
 
-setGlobalOptions({ maxInstances: 10 });
+setGlobalOptions({maxInstances: 10});
 
 // Turn endpoints
 export const createTurn = createTurnHandler;

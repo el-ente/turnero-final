@@ -1,6 +1,6 @@
-import { db } from "../config/firebase-admin";
-import { NotFoundError, ConflictError, ValidationError } from "../utils/errors";
-import { FieldValue } from "firebase-admin/firestore";
+import {db} from "../config/firebase-admin";
+import {NotFoundError, ConflictError, ValidationError} from "../utils/errors";
+import {FieldValue} from "firebase-admin/firestore";
 
 // ─── Sectors ───
 
@@ -29,7 +29,7 @@ export async function updateSector(sectorId: string, data: Record<string, any>) 
   const doc = await ref.get();
   if (!doc.exists) throw new NotFoundError("Sector not found");
 
-  const updateData: Record<string, any> = { updatedAt: new Date() };
+  const updateData: Record<string, any> = {updatedAt: new Date()};
   if (data.name !== undefined) updateData.name = data.name;
   if (data.description !== undefined) updateData.description = data.description;
 
@@ -108,7 +108,7 @@ export async function createQueue(data: {
     name: data.name,
     sectorId: data.sectorId,
     type: data.type || "normal",
-    reenqueueConfig: data.reenqueueConfig || { enabled: false, maxAttempts: 3, positionsBack: 5 },
+    reenqueueConfig: data.reenqueueConfig || {enabled: false, maxAttempts: 3, positionsBack: 5},
     priorityWeight: data.priorityWeight || 1,
     servedBy: [],
     createdAt: new Date(),
@@ -128,7 +128,7 @@ export async function updateQueue(queueId: string, data: Record<string, any>) {
   const doc = await ref.get();
   if (!doc.exists) throw new NotFoundError("Queue not found");
 
-  const updateData: Record<string, any> = { updatedAt: new Date() };
+  const updateData: Record<string, any> = {updatedAt: new Date()};
   if (data.name !== undefined) updateData.name = data.name;
   if (data.sectorId !== undefined) updateData.sectorId = data.sectorId;
   if (data.type !== undefined) updateData.type = data.type;
@@ -188,7 +188,7 @@ export async function createTerminal(data: {
     sectorIds: data.sectorIds || [],
     activeQueueIds: data.activeQueueIds || [],
     servingStrategy: data.servingStrategy || "fifo_across_queues",
-    strategyConfig: data.strategyConfig || { strategy: data.servingStrategy || "fifo_across_queues" },
+    strategyConfig: data.strategyConfig || {strategy: data.servingStrategy || "fifo_across_queues"},
     currentTurnId: null,
     status: "available",
     createdAt: new Date(),
@@ -213,7 +213,7 @@ export async function updateTerminal(terminalId: string, data: Record<string, an
   if (!doc.exists) throw new NotFoundError("Terminal not found");
 
   const oldData = doc.data()!;
-  const updateData: Record<string, any> = { updatedAt: new Date() };
+  const updateData: Record<string, any> = {updatedAt: new Date()};
   if (data.name !== undefined) updateData.name = data.name;
   if (data.sectorIds !== undefined) updateData.sectorIds = data.sectorIds;
   if (data.activeQueueIds !== undefined) updateData.activeQueueIds = data.activeQueueIds;
