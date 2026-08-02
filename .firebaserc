@@ -1,5 +1,9 @@
 {
   "projects": {
-    "default": "turnero-60150"
+    "default": "turnero-1212-dev",
+    "dev": "turnero-1212-dev",
+    "qa": "turnero-1212-qa",
+    "prod": "turnero-1212-prod",
+    "legacy": "turnero-60150"
   }
 }

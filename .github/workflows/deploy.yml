@@ -1,0 +1,55 @@
+name: Deploy
+on:
+  push:
+    branches: [develop, qa, main]
+jobs:
+  resolve-env:
+    runs-on: ubuntu-latest
+    outputs:
+      env_name: ${{ steps.map.outputs.env_name }}
+      project_id: ${{ steps.map.outputs.project_id }}
+    steps:
+      - id: map
+        run: |
+          case "${{ github.ref_name }}" in
+            develop) echo "env_name=dev"  >> "$GITHUB_OUTPUT"; echo "project_id=turnero-1212-dev"  >> "$GITHUB_OUTPUT" ;;
+            qa)      echo "env_name=qa"   >> "$GITHUB_OUTPUT"; echo "project_id=turnero-1212-qa"   >> "$GITHUB_OUTPUT" ;;
+            main)    echo "env_name=prod" >> "$GITHUB_OUTPUT"; echo "project_id=turnero-1212-prod" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  deploy:
+    needs: resolve-env
+    environment: ${{ needs.resolve-env.outputs.env_name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared
+        run: pnpm -F shared build
+      - name: Build app
+        run: pnpm -F app build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      - name: Build functions
+        run: pnpm -F functions build
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/775999037074/locations/global/workloadIdentityPools/github/providers/github-actions
+          service_account: gh-deployer@${{ needs.resolve-env.outputs.project_id }}.iam.gserviceaccount.com
+      - name: Deploy to Firebase
+        run: npx firebase-tools deploy --project ${{ needs.resolve-env.outputs.project_id }}
