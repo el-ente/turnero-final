@@ -65,6 +65,9 @@ importers:
 
   functions:
     dependencies:
+      '@firebase/app':
+        specifier: ^0.16.0
+        version: 0.16.0
       firebase-admin:
         specifier: ^13.6.0
         version: 13.7.0
@@ -386,6 +389,10 @@ packages:
     resolution: {integrity: sha512-PlPhdtjgWUra+LImQTnXOUqUa/jcufZhizdR93ZjlQSS3ahCtDTG6pJw7j0OwFal18DQjICXfeVNsUUrcNisfA==}
     engines: {node: '>=20.0.0'}
 
+  '@firebase/app@0.16.0':
+    resolution: {integrity: sha512-G+ZGEyVP8YTb3ay6A+XpcYgFH3sTESHcnHU/EyTktodqhz2BHkLq+QEP7IVwjiMX0cxYwpVKip0/wC0KZcn9vQ==}
+    engines: {node: '>=20.0.0'}
+
   '@firebase/auth-compat@0.6.4':
     resolution: {integrity: sha512-2pj8m/hnqXvMLfC0Mk+fORVTM5DQPkS6l8JpMgtoAWGVgCmYnoWdFMaNWtKbmCxBEyvMA3FlnCJyzrUSMWTfuA==}
     engines: {node: '>=20.0.0'}
@@ -413,6 +420,10 @@ packages:
 
   '@firebase/component@0.7.2':
     resolution: {integrity: sha512-iyVDGc6Vjx7Rm0cAdccLH/NG6fADsgJak/XW9IA2lPf8AjIlsemOpFGKczYyPHxm4rnKdR8z6sK4+KEC7NwmEg==}
+    engines: {node: '>=20.0.0'}
+
+  '@firebase/component@0.7.4':
+    resolution: {integrity: sha512-tLpOaaCol9ugUIYp2R3CbWPPA8Ajg/papX/XHEy8U52b/QXH3BbX8tTJX9aShDCjp+9sMAxMLD94i7lresdugQ==}
     engines: {node: '>=20.0.0'}
 
   '@firebase/data-connect@0.5.0':
@@ -483,6 +494,10 @@ packages:
     resolution: {integrity: sha512-cGskaAvkrnh42b3BA3doDWeBmuHFO/Mx5A83rbRDYakPjO9bJtRL3dX7javzc2Rr/JHZf4HlterTW2lUkfeN4g==}
     engines: {node: '>=20.0.0'}
 
+  '@firebase/logger@0.5.1':
+    resolution: {integrity: sha512-vZKLsqE1ABOy8OjQiE7cUTFn4gvaqlk88yp8N94Pk/sDpq61YqZGqmVFZTvOyflTwuYFcWirBdYGoJgbDaXKYQ==}
+    engines: {node: '>=20.0.0'}
+
   '@firebase/messaging-compat@0.2.25':
     resolution: {integrity: sha512-eoOQqGLtRlseTdiemTN44LlHZpltK5gnhq8XVUuLgtIOG+odtDzrz2UoTpcJWSzaJQVxNLb/x9f39tHdDM4N4w==}
     peerDependencies:
@@ -542,6 +557,10 @@ packages:
 
   '@firebase/util@1.15.0':
     resolution: {integrity: sha512-AmWf3cHAOMbrCPG4xdPKQaj5iHnyYfyLKZxwz+Xf55bqKbpAmcYifB4jQinT2W9XhDRHISOoPyBOariJpCG6FA==}
+    engines: {node: '>=20.0.0'}
+
+  '@firebase/util@1.15.2':
+    resolution: {integrity: sha512-974pWIZVLDMc5GW5YAsj8y0XxULxIy/sPUy7tsxmWbF93KRIyh9xpuHlh0zDL+shUcf5nHDjFOg9YLiQ763eiA==}
     engines: {node: '>=20.0.0'}
 
   '@firebase/webchannel-wrapper@1.0.5':
@@ -4038,6 +4057,14 @@ snapshots:
       idb: 7.1.1
       tslib: 2.8.1
 
+  '@firebase/app@0.16.0':
+    dependencies:
+      '@firebase/component': 0.7.4
+      '@firebase/logger': 0.5.1
+      '@firebase/util': 1.15.2
+      idb: 7.1.1
+      tslib: 2.8.1
+
   '@firebase/auth-compat@0.6.4(@firebase/app-compat@0.5.10)(@firebase/app-types@0.9.3)(@firebase/app@0.14.10)':
     dependencies:
       '@firebase/app-compat': 0.5.10
@@ -4069,6 +4096,11 @@ snapshots:
   '@firebase/component@0.7.2':
     dependencies:
       '@firebase/util': 1.15.0
+      tslib: 2.8.1
+
+  '@firebase/component@0.7.4':
+    dependencies:
+      '@firebase/util': 1.15.2
       tslib: 2.8.1
 
   '@firebase/data-connect@0.5.0(@firebase/app@0.14.10)':
@@ -4183,6 +4215,10 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
+  '@firebase/logger@0.5.1':
+    dependencies:
+      tslib: 2.8.1
+
   '@firebase/messaging-compat@0.2.25(@firebase/app-compat@0.5.10)(@firebase/app@0.14.10)':
     dependencies:
       '@firebase/app-compat': 0.5.10
@@ -4277,6 +4313,10 @@ snapshots:
       tslib: 2.8.1
 
   '@firebase/util@1.15.0':
+    dependencies:
+      tslib: 2.8.1
+
+  '@firebase/util@1.15.2':
     dependencies:
       tslib: 2.8.1
 
