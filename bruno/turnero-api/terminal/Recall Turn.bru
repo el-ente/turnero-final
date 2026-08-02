@@ -1,0 +1,18 @@
+meta {
+  name: Recall Turn
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/recallTurn
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "terminalId": "",
+    "turnId": ""
+  }
+}

@@ -1,0 +1,21 @@
+meta {
+  name: Update Terminal
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/updateTerminal?terminalId={{terminalId}}
+  body: json
+  auth: none
+}
+
+params:query {
+  terminalId:
+}
+
+body:json {
+  {
+    "name": ""
+  }
+}

@@ -1,0 +1,21 @@
+meta {
+  name: Update Queue
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/updateQueue?queueId={{queueId}}
+  body: json
+  auth: none
+}
+
+params:query {
+  queueId:
+}
+
+body:json {
+  {
+    "name": ""
+  }
+}

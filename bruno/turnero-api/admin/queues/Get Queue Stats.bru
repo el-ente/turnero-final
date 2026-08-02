@@ -1,0 +1,15 @@
+meta {
+  name: Get Queue Stats
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/getQueueStats?queueId={{queueId}}
+  body: none
+  auth: none
+}
+
+params:query {
+  queueId:
+}

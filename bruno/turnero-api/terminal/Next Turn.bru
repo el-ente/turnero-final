@@ -1,0 +1,17 @@
+meta {
+  name: Next Turn
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/nextTurn
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "terminalId": ""
+  }
+}

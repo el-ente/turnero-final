@@ -1,0 +1,15 @@
+meta {
+  name: Delete Sector
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/deleteSector?sectorId={{sectorId}}
+  body: none
+  auth: none
+}
+
+params:query {
+  sectorId:
+}

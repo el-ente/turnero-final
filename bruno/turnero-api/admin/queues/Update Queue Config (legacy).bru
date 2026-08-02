@@ -1,0 +1,21 @@
+meta {
+  name: Update Queue Config (legacy)
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/updateQueueConfig?queueId={{queueId}}
+  body: json
+  auth: none
+}
+
+params:query {
+  queueId:
+}
+
+body:json {
+  {
+    "name": ""
+  }
+}

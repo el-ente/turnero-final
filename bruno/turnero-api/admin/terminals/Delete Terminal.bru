@@ -1,0 +1,15 @@
+meta {
+  name: Delete Terminal
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/deleteTerminal?terminalId={{terminalId}}
+  body: none
+  auth: none
+}
+
+params:query {
+  terminalId:
+}

@@ -1,0 +1,17 @@
+meta {
+  name: Create Sector
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/createSector
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": ""
+  }
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Delete Queue
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/deleteQueue?queueId={{queueId}}
+  body: none
+  auth: none
+}
+
+params:query {
+  queueId:
+}
