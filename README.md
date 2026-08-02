@@ -32,7 +32,8 @@ turnero-final/
 - Node.js 24+
 - pnpm 10+
 - Firebase CLI (`npm i -g firebase-tools`)
-- Google Cloud account
+- Google Cloud account con acceso a los proyectos `turnero-1212-dev`/`qa`/`prod`
+- **Java Runtime (JRE)** — requerido por los emuladores de Firestore/Storage (ej. `brew install openjdk` en Mac)
 
 ### Instalación
 
@@ -41,20 +42,36 @@ git clone <repo>
 cd turnero-final
 pnpm install
 firebase login
+firebase use dev   # apunta el CLI local al proyecto turnero-1212-dev
 ```
+
+### Entornos
+
+Tres proyectos Firebase separados, mapeados por alias en `.firebaserc` y por branch en CI:
+
+| Alias      | Proyecto            | Branch     | Deploy                         |
+|------------|----------------------|------------|---------------------------------|
+| `dev`      | `turnero-1212-dev`   | `develop`  | automático en push               |
+| `qa`       | `turnero-1212-qa`    | `qa`       | automático en push               |
+| `prod`     | `turnero-1212-prod`  | `main`     | automático, requiere aprobación manual en GitHub |
+| `legacy`   | `turnero-60150`      | —          | proyecto original, sin uso activo |
+
+Trabajo día a día: ramas de feature desde `develop`, PR a `develop`. `qa` y `main` se actualizan por merge/fast-forward cuando corresponde promover.
 
 ### Variables de Entorno
 
-Crear `app/.env.local`:
+Crear `app/.env.local` (usar la config del proyecto **dev** para desarrollo local):
 
 ```
-VITE_FIREBASE_PROJECT_ID=turnero-60150
+VITE_FIREBASE_PROJECT_ID=turnero-1212-dev
 VITE_FIREBASE_API_KEY=<tu-api-key>
 VITE_FIREBASE_AUTH_DOMAIN=<tu-auth-domain>
 VITE_FIREBASE_STORAGE_BUCKET=<tu-bucket>
 VITE_FIREBASE_MESSAGING_SENDER_ID=<tu-sender-id>
 VITE_FIREBASE_APP_ID=<tu-app-id>
 ```
+
+Valores: `firebase apps:sdkconfig web <APP_ID> --project turnero-1212-dev`.
 
 ### Desarrollo
 
@@ -142,7 +159,7 @@ pnpm -F functions test:coverage
 ### Testing Manual
 
 ```bash
-curl -X POST http://localhost:5001/turnero-60150/us-central1/createTurn \
+curl -X POST http://localhost:5001/turnero-1212-dev/us-central1/createTurn \
   -H "Content-Type: application/json" \
   -d '{"queueId":"queue-1", "memberId":"member-1", "channel":"totem"}'
 ```
@@ -159,14 +176,18 @@ pnpm build
 
 ### Deploy a Firebase
 
+CI (GitHub Actions) despliega automáticamente en push a `develop`/`qa`/`main`, hacia sus proyectos correspondientes (ver tabla de Entornos arriba). El deploy a `main`/prod queda en espera hasta que alguien lo aprueba manualmente en la pestaña Actions del repo (GitHub Environment `prod` con required reviewer).
+
+Deploy manual (poco frecuente, usar el alias correcto):
+
 ```bash
-firebase deploy
+firebase deploy --project dev
 # o específico:
-firebase deploy --only functions
-firebase deploy --only hosting:app
+firebase deploy --project dev --only functions
+firebase deploy --project dev --only hosting:app
 ```
 
-Automático en merge a `main` (GitHub Actions).
+**Nota:** `functions/package.json` usa `"shared": "workspace:*"` para desarrollo local (resuelto por pnpm). El predeploy hook lo reemplaza temporalmente por una copia vendorizada (`functions/vendor/shared` + `file:` dependency) porque el build aislado de Cloud Functions no entiende el protocolo `workspace:`, y lo revierte después. Si un deploy local se interrumpe a mitad de camino, `functions/package.json` puede quedar con `file:vendor/shared` — revertir a mano con `git checkout functions/package.json` si pasa.
 
 ## 🗂️ Estructura de Datos
 
@@ -192,8 +213,8 @@ Numeración diaria por cola, reset a medianoche Argentina (UTC-3).
 - [x] Phase 1-6: Backend (types, config, CRUD, operations)
 - [x] Phase 7-10: Frontend (4 vistas)
 - [x] Phase 11: Unit tests
-- [ ] Phase 12: Firestore security rules
-- [ ] Phase 13: Firebase Auth
+- [ ] Phase 12: Firestore security rules (actual: `firestore.rules` es un stopgap permisivo, expira 2026-10-31 — sin fix real, todo acceso queda denegado después de esa fecha)
+- [ ] Phase 13: Firebase Auth (Google Sign-In ya habilitado en los 3 proyectos vía `firebase.json`, pero no integrado en el frontend todavía)
 - [ ] Phase 14: WhatsApp integration
 - [ ] Phase 15: Mobile app
 
