@@ -21,10 +21,10 @@
         "pnpm --prefix \"$RESOURCE_DIR\" run lint",
         "pnpm --prefix \"$RESOURCE_DIR\" run build",
         "rm -rf functions/vendor && mkdir -p functions/vendor/shared && cp -r shared/lib shared/package.json functions/vendor/shared/",
-        "npm pkg set dependencies.shared=file:vendor/shared --prefix functions"
+        "node -e 'const fs=require(\"fs\");const p=\"functions/package.json\";const j=JSON.parse(fs.readFileSync(p,\"utf8\"));j.dependencies.shared=\"file:vendor/shared\";fs.writeFileSync(p, JSON.stringify(j,null,2)+\"\\n\");console.log(\"patched:\", j.dependencies.shared)'"
       ],
       "postdeploy": [
-        "npm pkg set dependencies.shared=workspace:* --prefix functions"
+        "node -e 'const fs=require(\"fs\");const p=\"functions/package.json\";const j=JSON.parse(fs.readFileSync(p,\"utf8\"));j.dependencies.shared=\"workspace:*\";fs.writeFileSync(p, JSON.stringify(j,null,2)+\"\\n\")'"
       ]
     }
   ],
