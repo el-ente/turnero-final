@@ -21,6 +21,7 @@ module.exports = {
     "/lib/**/*", // Ignore built files.
     "/generated/**/*", // Ignore generated files.
     "jest.config.js", // Not included in tsconfig, type-aware lint can't parse it.
+    "scripts/**/*.js", // Plain Node deploy-time scripts, not part of the TS project.
   ],
   plugins: [
     "@typescript-eslint",
