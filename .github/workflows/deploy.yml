@@ -53,4 +53,4 @@ jobs:
           service_account: gh-deployer@${{ needs.resolve-env.outputs.project_id }}.iam.gserviceaccount.com
           token_format: access_token
       - name: Deploy to Firebase
-        run: npx firebase-tools deploy --project ${{ needs.resolve-env.outputs.project_id }} --token "${{ steps.auth.outputs.access_token }}"
+        run: npx firebase-tools deploy --project ${{ needs.resolve-env.outputs.project_id }} --token "${{ steps.auth.outputs.access_token }}" --force
