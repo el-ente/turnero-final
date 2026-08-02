@@ -19,7 +19,12 @@
       ],
       "predeploy": [
         "pnpm --prefix \"$RESOURCE_DIR\" run lint",
-        "pnpm --prefix \"$RESOURCE_DIR\" run build"
+        "pnpm --prefix \"$RESOURCE_DIR\" run build",
+        "rm -rf functions/vendor && mkdir -p functions/vendor/shared && cp -r shared/lib shared/package.json functions/vendor/shared/",
+        "npm pkg set dependencies.shared=file:vendor/shared --prefix functions"
+      ],
+      "postdeploy": [
+        "npm pkg set dependencies.shared=workspace:* --prefix functions"
       ]
     }
   ],

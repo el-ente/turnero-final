@@ -15,6 +15,9 @@ firebase-debug.*.log*
 .claude/
 skills-lock.json
 
+# Vendored shared package for Cloud Functions deploy (see firebase.json predeploy)
+functions/vendor/
+
 # Firebase config
 
 # Uncomment this if you'd like others to create their own Firebase project.
