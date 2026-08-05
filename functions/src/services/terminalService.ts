@@ -4,6 +4,7 @@ import {db} from "../config/firebase-admin";
 import {NotFoundError, ConflictError} from "../utils/errors";
 import {getWaitingTurnsAcrossQueues} from "./queueService";
 import {updateTurnStatus} from "./turnService";
+import {toMillis} from "../utils/dates";
 
 export function nextRatioCounterState(config: RatioBasedConfig, isPriority: boolean) {
   let normal = config.normalCounterState || 0;
@@ -239,9 +240,24 @@ export async function handleNoShow(terminalId: string, turnId: string): Promise<
     const config = queue.reenqueueConfig;
 
     if (config.enabled && turn.recallCount < config.maxAttempts) {
-      // Requeue the turn
+      // Requeue the turn: anchor its new queuedAt to just after the turn at the
+      // configured positionsBack in the current waiting list (clamped to the
+      // list's length), so it lands that many positions back, not always at
+      // the very end.
+      const waitingSnap = await transaction.get(
+        db.collection("turns")
+          .where("queueId", "==", turn.queueId)
+          .where("status", "==", TurnStatus.WAITING)
+          .orderBy("queuedAt", "asc")
+      );
+      const waiting = waitingSnap.docs.map((d) => d.data() as Turn);
+      const idx = Math.min(config.positionsBack, waiting.length);
+      const newQueuedAt = idx > 0 ?
+        new Date(toMillis(waiting[idx - 1].queuedAt) + 1) :
+        new Date();
+
       transaction.update(turnRef, {
-        currentTurnNumber: turn.currentTurnNumber + config.positionsBack,
+        queuedAt: newQueuedAt,
         status: TurnStatus.WAITING,
         recallCount: turn.recallCount + 1,
         lastRequeueAt: new Date(),

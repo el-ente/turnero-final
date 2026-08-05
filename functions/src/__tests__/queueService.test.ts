@@ -10,20 +10,22 @@ describe("Queue Service", () => {
   });
 
   describe("getWaitingTurns", () => {
-    it("should return turns ordered by currentTurnNumber", async () => {
+    it("should return turns ordered by queuedAt", async () => {
       const mockTurns = [
         {
           id: "turn-1",
           queueId: "queue-1",
-          currentTurnNumber: 1,
+          memberNumber: 4213,
           status: TurnStatus.WAITING,
+          queuedAt: new Date("2026-03-26T00:00:00"),
           createdAt: new Date("2026-03-26T00:00:00"),
         },
         {
           id: "turn-2",
           queueId: "queue-1",
-          currentTurnNumber: 2,
+          memberNumber: 8807,
           status: TurnStatus.WAITING,
+          queuedAt: new Date("2026-03-26T00:01:00"),
           createdAt: new Date("2026-03-26T00:01:00"),
         },
       ];
@@ -38,9 +40,7 @@ describe("Queue Service", () => {
         where: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
             orderBy: jest.fn().mockReturnValue({
-              orderBy: jest.fn().mockReturnValue({
-                get: jest.fn().mockResolvedValue(mockSnapshot),
-              }),
+              get: jest.fn().mockResolvedValue(mockSnapshot),
             }),
           }),
         }),
@@ -57,9 +57,7 @@ describe("Queue Service", () => {
         where: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
             orderBy: jest.fn().mockReturnValue({
-              orderBy: jest.fn().mockReturnValue({
-                get: jest.fn().mockResolvedValue(mockSnapshot),
-              }),
+              get: jest.fn().mockResolvedValue(mockSnapshot),
             }),
           }),
         }),
@@ -82,15 +80,17 @@ describe("Queue Service", () => {
           {
             data: () => ({
               id: "turn-1",
-              currentTurnNumber: 5,
+              memberNumber: 4213,
               status: TurnStatus.WAITING,
+              queuedAt: new Date("2026-03-26T00:00:00"),
             }),
           },
           {
             data: () => ({
               id: "turn-2",
-              currentTurnNumber: 3,
+              memberNumber: 8807,
               status: TurnStatus.WAITING,
+              queuedAt: new Date("2026-03-26T00:01:00"),
             }),
           },
         ],
@@ -100,9 +100,7 @@ describe("Queue Service", () => {
         where: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
             orderBy: jest.fn().mockReturnValue({
-              orderBy: jest.fn().mockReturnValue({
-                get: jest.fn().mockResolvedValue(mockSnapshot),
-              }),
+              get: jest.fn().mockResolvedValue(mockSnapshot),
             }),
           }),
         }),

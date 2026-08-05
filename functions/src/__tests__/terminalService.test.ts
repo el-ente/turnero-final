@@ -14,7 +14,21 @@ jest.mock("../services/queueService");
 function mockCollectionDocs() {
   (db.collection as jest.Mock).mockImplementation(() => ({
     doc: jest.fn().mockReturnValue({}),
+    // handleNoShow's requeue branch builds a where().where().orderBy() query
+    // on "turns" to pass to transaction.get — the query itself is never
+    // executed (transaction.get is mocked directly below), it just needs to
+    // be constructible without throwing.
+    where: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
   }));
+}
+
+// Mimics a Firestore Timestamp (only `.toDate()`, no `.getTime()`) — real
+// transaction.get() reads return these for queuedAt despite the `Date` type
+// annotation. Using a plain Date here would let a broken toMillis() call
+// (e.g. `.getTime()` used directly) pass by accident.
+function fakeTimestamp(ms: number): Date {
+  return {toDate: () => new Date(ms)} as unknown as Date;
 }
 
 describe("Terminal Service", () => {
@@ -205,10 +219,9 @@ describe("Terminal Service", () => {
       mockTerminalAndQueues(priorityPreferredTerminal(), queueDocs);
       const priorityTurn: Turn = {
         id: "turn-p1",
-        memberId: "member-1",
+        memberNumber: 1,
         queueId: "q2",
-        originalTurnNumber: 1,
-        currentTurnNumber: 1,
+        queuedAt: new Date(),
         status: TurnStatus.WAITING,
         channel: "totem",
         recallCount: 0,
@@ -227,10 +240,9 @@ describe("Terminal Service", () => {
       mockTerminalAndQueues(priorityPreferredTerminal(), queueDocs);
       const normalTurn: Turn = {
         id: "turn-n1",
-        memberId: "member-2",
+        memberNumber: 2,
         queueId: "q1",
-        originalTurnNumber: 2,
-        currentTurnNumber: 2,
+        queuedAt: new Date(),
         status: TurnStatus.WAITING,
         channel: "totem",
         recallCount: 0,
@@ -251,10 +263,9 @@ describe("Terminal Service", () => {
       mockTerminalAndQueues(normalPreferredTerminal(), queueDocs);
       const normalTurn: Turn = {
         id: "turn-n1",
-        memberId: "member-1",
+        memberNumber: 1,
         queueId: "q1",
-        originalTurnNumber: 1,
-        currentTurnNumber: 1,
+        queuedAt: new Date(),
         status: TurnStatus.WAITING,
         channel: "totem",
         recallCount: 0,
@@ -273,10 +284,9 @@ describe("Terminal Service", () => {
       mockTerminalAndQueues(normalPreferredTerminal(), queueDocs);
       const priorityTurn: Turn = {
         id: "turn-p1",
-        memberId: "member-2",
+        memberNumber: 2,
         queueId: "q2",
-        originalTurnNumber: 2,
-        currentTurnNumber: 2,
+        queuedAt: new Date(),
         status: TurnStatus.WAITING,
         channel: "totem",
         recallCount: 0,
@@ -353,10 +363,9 @@ describe("Terminal Service", () => {
       mockCollectionDocs();
       const mockTurn: Turn = {
         id: "turn-1",
-        memberId: "member-1",
+        memberNumber: 1,
         queueId: "queue-1",
-        originalTurnNumber: 1,
-        currentTurnNumber: 1,
+        queuedAt: new Date(),
         status: TurnStatus.CALLED,
         channel: "totem",
         recallCount: 0,
@@ -375,10 +384,9 @@ describe("Terminal Service", () => {
       mockCollectionDocs();
       const mockTurn: Turn = {
         id: "turn-1",
-        memberId: "member-1",
+        memberNumber: 1,
         queueId: "queue-1",
-        originalTurnNumber: 1,
-        currentTurnNumber: 1,
+        queuedAt: new Date(),
         status: TurnStatus.WAITING,
         channel: "totem",
         recallCount: 0,
@@ -418,10 +426,9 @@ describe("Terminal Service", () => {
       mockCollectionDocs();
       const mockTurn: Turn = {
         id: "turn-1",
-        memberId: "member-1",
+        memberNumber: 1,
         queueId: "queue-1",
-        originalTurnNumber: 1,
-        currentTurnNumber: 1,
+        queuedAt: new Date(),
         status: TurnStatus.WAITING,
         channel: "totem",
         recallCount: 0,
@@ -464,10 +471,9 @@ describe("Terminal Service", () => {
       mockCollectionDocs();
       const mockTurn: Turn = {
         id: "turn-1",
-        memberId: "member-1",
+        memberNumber: 1,
         queueId: "queue-1",
-        originalTurnNumber: 1,
-        currentTurnNumber: 1,
+        queuedAt: new Date(),
         status: TurnStatus.WAITING,
         channel: "totem",
         recallCount: 0,
@@ -511,10 +517,9 @@ describe("Terminal Service", () => {
     it("should throw error if turn is not in CALLED status", async () => {
       const mockTurn: Turn = {
         id: "turn-1",
-        memberId: "member-1",
+        memberNumber: 1,
         queueId: "queue-1",
-        originalTurnNumber: 1,
-        currentTurnNumber: 1,
+        queuedAt: new Date(),
         status: TurnStatus.WAITING,
         channel: "totem",
         recallCount: 0,
@@ -547,12 +552,22 @@ describe("Terminal Service", () => {
   });
 
   describe("handleNoShow", () => {
-    function mockTurnAndQueue(turn: Turn, queue: {reenqueueConfig: {enabled: boolean; maxAttempts: number; positionsBack: number}}) {
+    function mockTurnAndQueue(
+      turn: Turn,
+      queue: {reenqueueConfig: {enabled: boolean; maxAttempts: number; positionsBack: number}},
+      waitingTurns?: Partial<Turn>[]
+    ) {
       const transaction = mockRunTransaction();
       transaction.get
         .mockResolvedValueOnce({exists: true}) // terminal
         .mockResolvedValueOnce({exists: true, data: () => turn}) // turn
         .mockResolvedValueOnce({exists: true, data: () => queue}); // queue
+      if (waitingTurns) {
+        // 4th transaction.get call: the requeue branch's waiting-list query.
+        transaction.get.mockResolvedValueOnce({
+          docs: waitingTurns.map((t) => ({data: () => t})),
+        });
+      }
       return transaction;
     }
 
@@ -565,28 +580,35 @@ describe("Terminal Service", () => {
       expect(transaction.update).not.toHaveBeenCalled();
     });
 
-    it("should requeue the turn when recallCount is under maxAttempts", async () => {
+    it("should requeue the turn behind the configured positionsBack count", async () => {
       mockCollectionDocs();
       const mockTurn: Turn = {
         id: "turn-1",
-        memberId: "member-1",
+        memberNumber: 1,
         queueId: "queue-1",
-        originalTurnNumber: 5,
-        currentTurnNumber: 5,
+        queuedAt: new Date(),
         status: TurnStatus.CALLED,
         channel: "totem",
         recallCount: 0,
         createdAt: new Date(),
       };
       const mockQueue = {reenqueueConfig: {enabled: true, maxAttempts: 3, positionsBack: 2}};
-      const transaction = mockTurnAndQueue(mockTurn, mockQueue);
+      const base = Date.now();
+      // 3 waiting turns; positionsBack=2 clamps to idx=2, so the anchor is
+      // waiting[1] (the turn immediately before index 2), not waiting[2].
+      const waiting: Partial<Turn>[] = [
+        {queuedAt: fakeTimestamp(base)},
+        {queuedAt: fakeTimestamp(base + 1000)},
+        {queuedAt: fakeTimestamp(base + 2000)},
+      ];
+      const transaction = mockTurnAndQueue(mockTurn, mockQueue, waiting);
 
       await handleNoShow("terminal-1", "turn-1");
 
       expect(transaction.update).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          currentTurnNumber: 7,
+          queuedAt: new Date(base + 1000 + 1),
           recallCount: 1,
           status: TurnStatus.WAITING,
         })
@@ -597,14 +619,72 @@ describe("Terminal Service", () => {
       );
     });
 
+    it("clamps to the back of the waiting list when positionsBack exceeds its length", async () => {
+      mockCollectionDocs();
+      const mockTurn: Turn = {
+        id: "turn-1",
+        memberNumber: 1,
+        queueId: "queue-1",
+        queuedAt: new Date(),
+        status: TurnStatus.CALLED,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: new Date(),
+      };
+      // positionsBack (5) exceeds the waiting list length (2): clamp to
+      // idx = waiting.length = 2, anchoring behind the last waiting turn.
+      const mockQueue = {reenqueueConfig: {enabled: true, maxAttempts: 3, positionsBack: 5}};
+      const base = Date.now();
+      const waiting: Partial<Turn>[] = [
+        {queuedAt: fakeTimestamp(base)},
+        {queuedAt: fakeTimestamp(base + 1000)},
+      ];
+      const transaction = mockTurnAndQueue(mockTurn, mockQueue, waiting);
+
+      await handleNoShow("terminal-1", "turn-1");
+
+      expect(transaction.update).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          queuedAt: new Date(base + 1000 + 1),
+          recallCount: 1,
+          status: TurnStatus.WAITING,
+        })
+      );
+    });
+
+    it("anchors to now() when the waiting list is empty", async () => {
+      mockCollectionDocs();
+      const mockTurn: Turn = {
+        id: "turn-1",
+        memberNumber: 1,
+        queueId: "queue-1",
+        queuedAt: new Date(),
+        status: TurnStatus.CALLED,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: new Date(),
+      };
+      const mockQueue = {reenqueueConfig: {enabled: true, maxAttempts: 3, positionsBack: 2}};
+      const before = Date.now();
+      const transaction = mockTurnAndQueue(mockTurn, mockQueue, []);
+
+      await handleNoShow("terminal-1", "turn-1");
+
+      const updateCall = transaction.update.mock.calls.find(
+        (call) => (call[1] as Partial<Turn>).status === TurnStatus.WAITING
+      );
+      const queuedAt = (updateCall?.[1] as Partial<Turn>).queuedAt as Date;
+      expect(queuedAt.getTime()).toBeGreaterThanOrEqual(before);
+    });
+
     it("should cancel the turn when maxAttempts is reached", async () => {
       mockCollectionDocs();
       const mockTurn: Turn = {
         id: "turn-1",
-        memberId: "member-1",
+        memberNumber: 1,
         queueId: "queue-1",
-        originalTurnNumber: 5,
-        currentTurnNumber: 5,
+        queuedAt: new Date(),
         status: TurnStatus.CALLED,
         channel: "totem",
         recallCount: 3,
@@ -625,20 +705,21 @@ describe("Terminal Service", () => {
       const docUpdateSpy = jest.fn();
       (db.collection as jest.Mock).mockImplementation(() => ({
         doc: jest.fn().mockReturnValue({update: docUpdateSpy}),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
       }));
       const mockTurn: Turn = {
         id: "turn-1",
-        memberId: "member-1",
+        memberNumber: 1,
         queueId: "queue-1",
-        originalTurnNumber: 5,
-        currentTurnNumber: 5,
+        queuedAt: new Date(),
         status: TurnStatus.CALLED,
         channel: "totem",
         recallCount: 0,
         createdAt: new Date(),
       };
       const mockQueue = {reenqueueConfig: {enabled: true, maxAttempts: 3, positionsBack: 2}};
-      const transaction = mockTurnAndQueue(mockTurn, mockQueue);
+      const transaction = mockTurnAndQueue(mockTurn, mockQueue, []);
 
       await handleNoShow("terminal-1", "turn-1");
 

@@ -1,6 +1,7 @@
 import {Turn, TurnStatus} from "shared";
 import {db} from "../config/firebase-admin";
 import {NotFoundError} from "../utils/errors";
+import {toMillis} from "../utils/dates";
 
 const ARGENTINA_OFFSET = -3 * 60; // UTC-3 in minutes
 
@@ -17,14 +18,6 @@ function getTodayMidnightInArgentina(): Date {
     0
   );
   return new Date(midnight.getTime() - (ARGENTINA_OFFSET + now.getTimezoneOffset()) * 60000);
-}
-
-// Turn's Date-typed fields arrive as Firestore Timestamps at runtime (Admin SDK
-// doesn't convert them), not native Dates — mirrors app/src/lib/dates.ts on the client.
-function toMillis(value: Date | { toDate(): Date }): number {
-  return typeof (value as { toDate?: () => Date }).toDate === "function" ?
-    (value as { toDate(): Date }).toDate().getTime() :
-    (value as Date).getTime();
 }
 
 export interface QueueStats {

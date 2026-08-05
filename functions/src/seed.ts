@@ -154,10 +154,9 @@ async function seed() {
 
     const turn1: Turn = {
       id: "turn-1",
-      memberId: "member-1",
+      memberNumber: 4213,
       queueId: queue1.id,
-      originalTurnNumber: 1,
-      currentTurnNumber: 1,
+      queuedAt: todayMidnight,
       status: TurnStatus.WAITING,
       channel: "totem",
       recallCount: 0,
@@ -166,10 +165,9 @@ async function seed() {
 
     const turn2: Turn = {
       id: "turn-2",
-      memberId: "member-2",
+      memberNumber: 8807,
       queueId: queue2.id,
-      originalTurnNumber: 1,
-      currentTurnNumber: 1,
+      queuedAt: todayMidnight,
       status: TurnStatus.WAITING,
       channel: "totem",
       recallCount: 0,
@@ -178,10 +176,9 @@ async function seed() {
 
     const turn3: Turn = {
       id: "turn-3",
-      memberId: "member-3",
+      memberNumber: 15029,
       queueId: queue1.id,
-      originalTurnNumber: 2,
-      currentTurnNumber: 2,
+      queuedAt: todayMidnight,
       status: TurnStatus.CALLED,
       channel: "totem",
       recallCount: 0,
@@ -192,10 +189,9 @@ async function seed() {
 
     const turn4: Turn = {
       id: "turn-4",
-      memberId: "member-4",
+      memberNumber: 372,
       queueId: queue2.id,
-      originalTurnNumber: 2,
-      currentTurnNumber: 2,
+      queuedAt: todayMidnight,
       status: TurnStatus.ATTENDING,
       channel: "totem",
       recallCount: 0,
@@ -207,10 +203,9 @@ async function seed() {
 
     const turn5: Turn = {
       id: "turn-5",
-      memberId: "member-5",
+      memberNumber: 91,
       queueId: queue3.id,
-      originalTurnNumber: 1,
-      currentTurnNumber: 1,
+      queuedAt: todayMidnight,
       status: TurnStatus.WAITING,
       channel: "totem",
       recallCount: 0,
@@ -219,10 +214,9 @@ async function seed() {
 
     const turn6: Turn = {
       id: "turn-6",
-      memberId: "member-6",
+      memberNumber: 56234,
       queueId: queue1.id,
-      originalTurnNumber: 3,
-      currentTurnNumber: 3,
+      queuedAt: todayMidnight,
       status: TurnStatus.FINISHED,
       channel: "totem",
       recallCount: 0,
@@ -235,10 +229,9 @@ async function seed() {
 
     const turn7: Turn = {
       id: "turn-7",
-      memberId: "member-7",
+      memberNumber: 2658,
       queueId: queue2.id,
-      originalTurnNumber: 3,
-      currentTurnNumber: 6, // requeued
+      queuedAt: new Date(now.getTime() - 180000), // requeued: advanced past createdAt
       status: TurnStatus.WAITING,
       channel: "totem",
       recallCount: 1,

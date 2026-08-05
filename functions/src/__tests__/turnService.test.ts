@@ -17,13 +17,13 @@ describe("Turn Service", () => {
 
   describe("createTurn", () => {
     // Sets up db.collection so "queues" resolves to an existing queue doc,
-    // and "turns" resolves to a chainable where().where() query object
-    // (the actual query shape doesn't matter — transaction.get is mocked
-    // directly via mockRunTransaction()).
+    // and "turns" resolves to a doc() that returns a fresh ref with a plain
+    // set() spy (createTurn no longer uses a transaction).
     function mockQueueExists() {
+      const setSpy = jest.fn().mockResolvedValue(undefined);
+      const turnRef = {id: "new-turn-id", set: setSpy};
       const turnsCollection = {
-        where: jest.fn().mockReturnThis(),
-        doc: jest.fn().mockReturnValue({id: "new-turn-id"}),
+        doc: jest.fn().mockReturnValue(turnRef),
       };
 
       (db.collection as jest.Mock).mockImplementation((name: string) => {
@@ -40,41 +40,18 @@ describe("Turn Service", () => {
         throw new Error(`Unexpected collection: ${name}`);
       });
 
-      return turnsCollection;
+      return {setSpy};
     }
 
-    it("computes the true max turn number across ALL of today's turns, not just the most recent", async () => {
-      mockQueueExists();
-      const transaction = mockRunTransaction();
+    it("returns the createdAt that was actually written via set()", async () => {
+      const {setSpy} = mockQueueExists();
 
-      // Turn A was created first but requeued twice, so its currentTurnNumber (6)
-      // is higher than turn B's, even though B was created more recently.
-      const turnA: Partial<Turn> = {originalTurnNumber: 1, currentTurnNumber: 6};
-      const turnB: Partial<Turn> = {originalTurnNumber: 2, currentTurnNumber: 2};
-      transaction.get.mockResolvedValue({
-        docs: [{data: () => turnA}, {data: () => turnB}],
-      });
+      const result = await createTurn("queue-1", 4213);
 
-      const result = await createTurn("queue-1", "member-1");
-
-      // Must be max(6, 2) + 1 = 7, not 3 (which the old "most recent doc" logic would give).
-      expect(result.originalTurnNumber).toBe(7);
-      expect(result.currentTurnNumber).toBe(7);
-
-      const setCallArg = transaction.set.mock.calls[0][1] as Turn;
-      expect(setCallArg.originalTurnNumber).toBe(7);
-      expect(setCallArg.currentTurnNumber).toBe(7);
-    });
-
-    it("returns the createdAt that was actually written in the transaction", async () => {
-      mockQueueExists();
-      const transaction = mockRunTransaction();
-      transaction.get.mockResolvedValue({docs: []});
-
-      const result = await createTurn("queue-1", "member-1");
-
-      const setCallArg = transaction.set.mock.calls[0][1] as Turn;
+      const setCallArg = setSpy.mock.calls[0][0] as Turn;
       expect(result.createdAt).toBe(setCallArg.createdAt);
+      expect(result.queuedAt).toBe(setCallArg.createdAt);
+      expect(result.memberNumber).toBe(4213);
     });
 
     it("should reject if queue does not exist", async () => {
@@ -86,8 +63,25 @@ describe("Turn Service", () => {
         }),
       });
 
-      // This would throw NotFoundError
-      expect(createTurn("invalid-queue", "member-1")).rejects.toThrow();
+      expect(createTurn("invalid-queue", 4213)).rejects.toThrow();
+    });
+
+    describe("memberNumber validation", () => {
+      it.each([0, 100000, 1.5, -1])(
+        "rejects %p with ValidationError",
+        async (memberNumber) => {
+          await expect(createTurn("queue-1", memberNumber)).rejects.toThrow("memberNumber must be an integer between 1 and 99999");
+        }
+      );
+
+      it.each([1, 99999])("accepts %p", async (memberNumber) => {
+        const {setSpy} = mockQueueExists();
+
+        const result = await createTurn("queue-1", memberNumber);
+
+        expect(result.memberNumber).toBe(memberNumber);
+        expect(setSpy).toHaveBeenCalledTimes(1);
+      });
     });
   });
 
@@ -142,7 +136,7 @@ describe("Turn Service", () => {
         }),
       });
 
-      const turn = await getCurrentTurn("member-1");
+      const turn = await getCurrentTurn(4213);
       expect(turn).toBeNull();
     });
   });

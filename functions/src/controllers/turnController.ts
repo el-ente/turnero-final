@@ -10,14 +10,14 @@ export const createTurnHandler = onRequest({cors: true}, async (req, res) => {
       return;
     }
 
-    const {queueId, memberId, channel} = req.body;
+    const {queueId, memberNumber, channel} = req.body;
 
-    if (!queueId || !memberId) {
-      res.status(400).json({error: "queueId and memberId are required"});
+    if (!queueId || !memberNumber) {
+      res.status(400).json({error: "queueId and memberNumber are required"});
       return;
     }
 
-    const turn = await createTurn(queueId, memberId, channel || "totem");
+    const turn = await createTurn(queueId, memberNumber, channel || "totem");
     res.status(201).json(turn);
   } catch (error) {
     if (error instanceof BusinessError) {
@@ -36,14 +36,14 @@ export const getCurrentTurnHandler = onRequest({cors: true}, async (req, res) =>
       return;
     }
 
-    const {memberId} = req.query;
+    const memberNumber = Number(req.query.memberNumber);
 
-    if (!memberId || typeof memberId !== "string") {
-      res.status(400).json({error: "memberId query parameter is required"});
+    if (!Number.isInteger(memberNumber)) {
+      res.status(400).json({error: "memberNumber query parameter must be an integer"});
       return;
     }
 
-    const turn = await getCurrentTurn(memberId);
+    const turn = await getCurrentTurn(memberNumber);
     if (!turn) {
       res.status(404).json({error: "No active turn found"});
       return;

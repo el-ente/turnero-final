@@ -6,8 +6,7 @@ export async function getWaitingTurns(queueId: string): Promise<Turn[]> {
     .collection("turns")
     .where("queueId", "==", queueId)
     .where("status", "==", TurnStatus.WAITING)
-    .orderBy("currentTurnNumber", "asc")
-    .orderBy("createdAt", "asc")
+    .orderBy("queuedAt", "asc")
     .get();
 
   return snapshot.docs.map((doc) => doc.data() as Turn);
@@ -22,8 +21,7 @@ export async function getWaitingTurnsAcrossQueues(queueIds: string[]): Promise<T
     .collection("turns")
     .where("queueId", "in", queueIds)
     .where("status", "==", TurnStatus.WAITING)
-    .orderBy("currentTurnNumber", "asc")
-    .orderBy("createdAt", "asc")
+    .orderBy("queuedAt", "asc")
     .get();
 
   return snapshot.docs.map((doc) => doc.data() as Turn);

@@ -13,10 +13,9 @@ export type Channel = "totem" | "whatsapp" | "mobile";
 
 export interface Turn {
   id: string;
-  memberId: string;
+  memberNumber: number;
   queueId: string;
-  originalTurnNumber: number;
-  currentTurnNumber: number;
+  queuedAt: Date;
   status: TurnStatus;
   channel: Channel;
   recallCount: number;

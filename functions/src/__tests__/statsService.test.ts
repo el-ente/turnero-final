@@ -31,10 +31,9 @@ describe("Stats Service", () => {
       const mockTurns: Turn[] = [
         {
           id: "turn-1",
-          memberId: "member-1",
+          memberNumber: 1,
           queueId: "queue-1",
-          originalTurnNumber: 1,
-          currentTurnNumber: 1,
+          queuedAt: new Date(),
           status: TurnStatus.WAITING,
           channel: "totem",
           recallCount: 0,
@@ -42,10 +41,9 @@ describe("Stats Service", () => {
         },
         {
           id: "turn-2",
-          memberId: "member-2",
+          memberNumber: 2,
           queueId: "queue-1",
-          originalTurnNumber: 2,
-          currentTurnNumber: 2,
+          queuedAt: new Date(),
           status: TurnStatus.FINISHED,
           channel: "totem",
           recallCount: 0,
@@ -105,10 +103,9 @@ describe("Stats Service", () => {
       const mockTurns: Turn[] = [
         {
           id: "turn-1",
-          memberId: "member-1",
+          memberNumber: 1,
           queueId: "queue-1",
-          originalTurnNumber: 1,
-          currentTurnNumber: 1,
+          queuedAt: new Date(),
           status: TurnStatus.FINISHED,
           channel: "totem",
           recallCount: 0,

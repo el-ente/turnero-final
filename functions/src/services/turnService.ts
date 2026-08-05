@@ -1,99 +1,32 @@
-import {Turn, TurnStatus} from "shared";
+import {Turn, TurnStatus, Channel} from "shared";
 import {db} from "../config/firebase-admin";
-import {NotFoundError, ConflictError} from "../utils/errors";
-
-const ARGENTINA_OFFSET = -3 * 60; // UTC-3 in minutes
-
-function getTodayMidnightInArgentina(): Date {
-  const now = new Date();
-  const localDate = new Date(now.getTime() + (ARGENTINA_OFFSET + now.getTimezoneOffset()) * 60000);
-  const midnight = new Date(
-    localDate.getFullYear(),
-    localDate.getMonth(),
-    localDate.getDate(),
-    0,
-    0,
-    0,
-    0
-  );
-  return new Date(midnight.getTime() - (ARGENTINA_OFFSET + now.getTimezoneOffset()) * 60000);
-}
+import {NotFoundError, ConflictError, ValidationError} from "../utils/errors";
 
 export async function createTurn(
   queueId: string,
-  memberId: string,
-  channel: "totem" | "whatsapp" | "mobile" = "totem"
+  memberNumber: number,
+  channel: Channel = "totem"
 ): Promise<Turn> {
-  // Validate queue exists
-  const queueDoc = await db.collection("queues").doc(queueId).get();
-  if (!queueDoc.exists) {
-    throw new NotFoundError(`Queue ${queueId} not found`);
+  if (!Number.isInteger(memberNumber) || memberNumber < 1 || memberNumber > 99999) {
+    throw new ValidationError("memberNumber must be an integer between 1 and 99999");
   }
+  const queueDoc = await db.collection("queues").doc(queueId).get();
+  if (!queueDoc.exists) throw new NotFoundError(`Queue ${queueId} not found`);
 
-  let turnId = "";
-  let turnNumber = 0;
-  let createdAt = new Date();
-
-  // Use transaction to get next number and create turn atomically
-  await db.runTransaction(async (transaction) => {
-    const today = getTodayMidnightInArgentina();
-
-    // Find the highest turn number for this queue today across ALL of today's turns,
-    // not just the most recently created one (requeues bump currentTurnNumber without
-    // changing createdAt, so the most-recent doc isn't necessarily the highest).
-    const turnsSnap = await transaction.get(
-      db
-        .collection("turns")
-        .where("queueId", "==", queueId)
-        .where("createdAt", ">=", today)
-    );
-
-    let maxNumber = 0;
-    turnsSnap.docs.forEach((doc) => {
-      const t = doc.data() as Turn;
-      maxNumber = Math.max(maxNumber, t.originalTurnNumber, t.currentTurnNumber);
-    });
-
-    turnNumber = maxNumber + 1;
-    createdAt = new Date();
-
-    // Create new turn
-    const newTurn: Turn = {
-      id: "",
-      memberId,
-      queueId,
-      originalTurnNumber: turnNumber,
-      currentTurnNumber: turnNumber,
-      status: TurnStatus.WAITING,
-      channel,
-      recallCount: 0,
-      createdAt,
-    };
-
-    const turnRef = db.collection("turns").doc();
-    newTurn.id = turnRef.id;
-
-    transaction.set(turnRef, newTurn);
-    turnId = turnRef.id;
-  });
-
-  return {
-    id: turnId,
-    memberId,
-    queueId,
-    originalTurnNumber: turnNumber,
-    currentTurnNumber: turnNumber,
-    status: TurnStatus.WAITING,
-    channel,
-    recallCount: 0,
-    createdAt,
+  const turnRef = db.collection("turns").doc();
+  const createdAt = new Date();
+  const newTurn: Turn = {
+    id: turnRef.id, memberNumber, queueId, queuedAt: createdAt,
+    status: TurnStatus.WAITING, channel, recallCount: 0, createdAt,
   };
+  await turnRef.set(newTurn);
+  return newTurn;
 }
 
-export async function getCurrentTurn(memberId: string): Promise<Turn | null> {
+export async function getCurrentTurn(memberNumber: number): Promise<Turn | null> {
   const turnsSnap = await db
     .collection("turns")
-    .where("memberId", "==", memberId)
+    .where("memberNumber", "==", memberNumber)
     .where("status", "in", [TurnStatus.WAITING, TurnStatus.CALLED, TurnStatus.ATTENDING])
     .orderBy("createdAt", "desc")
     .limit(1)
