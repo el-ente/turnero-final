@@ -8,6 +8,18 @@ import {
   apiListTerminals, apiCreateTerminal, apiUpdateTerminal, apiDeleteTerminal,
 } from "../lib/api";
 
+const QUEUE_TYPE_LABELS: Record<string, string> = { normal: "Normal", priority: "Prioritaria" };
+
+/** avgWaitTimeSeconds arrives as raw seconds — render it human-scannable. */
+function formatWait(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
 type ModalMode =
   | null
   | { type: "create-sector" }
@@ -86,9 +98,18 @@ export function AdminView() {
         {tab === "queues" && (
           <div className="adm-section">
             <div className="adm-section-top">
-              <h2>Gestión de Colas</h2>
+              <div className="adm-section-heading">
+                <h2>Gestión de Colas</h2>
+                <span className="adm-count-stamp">{queues.length} registrada{queues.length !== 1 ? "s" : ""}</span>
+              </div>
               <button className="adm-btn-new" onClick={() => setModal({ type: "create-queue" })}>+ Nueva Cola</button>
             </div>
+            {queues.length === 0 ? (
+              <div className="adm-empty">
+                <p className="adm-empty-title">Todavía no hay colas.</p>
+                <p className="adm-empty-sub">Creá la primera para empezar a atender turnos.</p>
+              </div>
+            ) : (
             <div className="adm-table-wrap">
               <table className="adm-table">
                 <thead>
@@ -104,7 +125,7 @@ export function AdminView() {
                   {queues.map((queue) => (
                     <tr key={queue.id}>
                       <td className="adm-bold">{queue.name}</td>
-                      <td><span className={`adm-pill adm-pill-${queue.type}`}>{queue.type}</span></td>
+                      <td><span className={`adm-pill adm-pill-${queue.type}`}>{QUEUE_TYPE_LABELS[queue.type] ?? queue.type}</span></td>
                       <td>{getSectorName(queue.sectorId)}</td>
                       <td>
                         <span className={`adm-pill ${queue.reenqueueConfig?.enabled ? "adm-pill-on" : "adm-pill-off"}`}>
@@ -118,10 +139,10 @@ export function AdminView() {
                       </td>
                     </tr>
                   ))}
-                  {queues.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin colas</td></tr>}
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
 
@@ -129,9 +150,18 @@ export function AdminView() {
         {tab === "terminals" && (
           <div className="adm-section">
             <div className="adm-section-top">
-              <h2>Gestión de Terminales</h2>
+              <div className="adm-section-heading">
+                <h2>Gestión de Terminales</h2>
+                <span className="adm-count-stamp">{terminals.length} registrada{terminals.length !== 1 ? "s" : ""}</span>
+              </div>
               <button className="adm-btn-new" onClick={() => setModal({ type: "create-terminal" })}>+ Nueva Terminal</button>
             </div>
+            {terminals.length === 0 ? (
+              <div className="adm-empty">
+                <p className="adm-empty-title">Todavía no hay terminales.</p>
+                <p className="adm-empty-sub">Creá una para que un operador pueda empezar a atender.</p>
+              </div>
+            ) : (
             <div className="adm-table-wrap">
               <table className="adm-table">
                 <thead>
@@ -156,10 +186,10 @@ export function AdminView() {
                       </td>
                     </tr>
                   ))}
-                  {terminals.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin terminales</td></tr>}
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
 
@@ -167,9 +197,18 @@ export function AdminView() {
         {tab === "sectors" && (
           <div className="adm-section">
             <div className="adm-section-top">
-              <h2>Gestión de Sectores</h2>
+              <div className="adm-section-heading">
+                <h2>Gestión de Sectores</h2>
+                <span className="adm-count-stamp">{sectors.length} registrado{sectors.length !== 1 ? "s" : ""}</span>
+              </div>
               <button className="adm-btn-new" onClick={() => setModal({ type: "create-sector" })}>+ Nuevo Sector</button>
             </div>
+            {sectors.length === 0 ? (
+              <div className="adm-empty">
+                <p className="adm-empty-title">Todavía no hay sectores.</p>
+                <p className="adm-empty-sub">Creá uno para empezar a organizar tus colas.</p>
+              </div>
+            ) : (
             <div className="adm-table-wrap">
               <table className="adm-table">
                 <thead>
@@ -192,10 +231,10 @@ export function AdminView() {
                       </td>
                     </tr>
                   ))}
-                  {sectors.length === 0 && <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--text-muted)" }}>Sin sectores</td></tr>}
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
 
@@ -215,9 +254,9 @@ export function AdminView() {
                 { label: "Finalizados", value: statsData.finishedCount },
                 { label: "No presentados", value: statsData.noShowCount },
                 { label: "Cancelados", value: statsData.cancelledCount },
-                { label: "Espera promedio", value: `${statsData.avgWaitTimeSeconds}s` },
+                { label: "Espera promedio", value: formatWait(statsData.avgWaitTimeSeconds) },
               ].map((s) => (
-                <div key={s.label} className="adm-stat-card">
+                <div key={s.label} className="adm-stat-card tear-edge">
                   <div className="adm-stat-label">{s.label}</div>
                   <div className="adm-stat-value">{s.value}</div>
                 </div>
@@ -621,6 +660,7 @@ const adminStyles = `
   }
 
   .adm-tab {
+    position: relative;
     padding: 0.5rem 1rem;
     border: none;
     background: transparent;
@@ -629,12 +669,24 @@ const adminStyles = `
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     transition: all 0.15s ease;
   }
 
   .adm-tab:hover { color: var(--text); background: var(--surface-warm); }
   .adm-tab.active { color: var(--primary); background: var(--primary-light); font-weight: 600; }
+
+  /* Ledger index-tab flag on the active section */
+  .adm-tab.active::after {
+    content: "";
+    position: absolute;
+    left: 0.6rem;
+    right: 0.6rem;
+    bottom: -1px;
+    height: 3px;
+    background: var(--primary);
+    border-radius: 2px 2px 0 0;
+  }
 
   .adm-body {
     flex: 1;
@@ -665,6 +717,47 @@ const adminStyles = `
     color: var(--text);
   }
 
+  .adm-section-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  /* A small stamped count, like a ledger tally mark */
+  .adm-count-stamp {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--secondary);
+    border: 1.5px dashed var(--secondary);
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    transform: rotate(-1.5deg);
+    white-space: nowrap;
+  }
+
+  .adm-empty {
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 2.5rem;
+    text-align: center;
+  }
+
+  .adm-empty-title {
+    color: var(--text);
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .adm-empty-sub {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
   .adm-btn-new {
     padding: 0.6rem 1.25rem;
     background: var(--primary);
@@ -686,6 +779,7 @@ const adminStyles = `
   .adm-table-wrap {
     background: var(--surface);
     border: 1px solid var(--border);
+    border-left: 3px solid var(--primary-light);
     border-radius: var(--radius);
     overflow: hidden;
   }
@@ -776,8 +870,8 @@ const adminStyles = `
   .adm-stat-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.5rem;
+    border-radius: 6px 6px var(--radius) var(--radius);
+    padding: 2.1rem 1.5rem 1.5rem;
     text-align: center;
   }
 

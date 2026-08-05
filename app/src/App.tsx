@@ -1,9 +1,10 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { TotemView } from './views/TotemView'
 import { PublicDisplay } from './views/PublicDisplay'
 import { TerminalView } from './views/TerminalView'
 import { TerminalSelector } from './views/TerminalSelector'
 import { AdminView } from './views/AdminView'
+import { TicketMark } from './components/TicketMark'
 import './App.css'
 
 function App() {
@@ -17,12 +18,15 @@ function App() {
         <Route path="/*" element={
           <div className="app">
             <nav className="navbar">
-              <h1>🎫 Turnero Digital</h1>
+              <h1 className="navbar-brand">
+                <TicketMark size={22} />
+                Turnero
+              </h1>
               <ul className="nav-links">
-                <li><Link to="/">Totem</Link></li>
-                <li><Link to="/display">Pantalla Pública</Link></li>
-                <li><Link to="/terminal">Terminal</Link></li>
-                <li><Link to="/admin">Admin</Link></li>
+                <li><NavLink to="/" end>Totem</NavLink></li>
+                <li><NavLink to="/display">Pantalla Pública</NavLink></li>
+                <li><NavLink to="/terminal">Terminal</NavLink></li>
+                <li><NavLink to="/admin">Admin</NavLink></li>
               </ul>
             </nav>
 

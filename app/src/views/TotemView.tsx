@@ -4,6 +4,7 @@ import { createTurn, getCurrentTurn } from "../lib/api";
 import { toDate } from "../lib/dates";
 import { db } from "../lib/firebase";
 import { collection, getDocs, query, doc, onSnapshot } from "firebase/firestore";
+import { TicketMark } from "../components/TicketMark";
 
 function getOrCreateMemberId(): string {
   const key = "totem-member-id";
@@ -130,7 +131,7 @@ export function TotemView() {
       <div className="totem">
         <div className="totem-card">
           <div className="totem-header">
-            <span className="totem-icon">🎟</span>
+            <TicketMark size={36} className="totem-icon" />
             <h1>Sacar turno</h1>
             <p className="totem-subtitle">Seleccioná la cola y retirá tu número</p>
           </div>
@@ -292,9 +293,9 @@ const selectingStyles = `
   }
 
   .totem-icon {
-    font-size: 2.5rem;
     display: block;
-    margin-bottom: 0.75rem;
+    margin: 0 auto 0.75rem;
+    color: var(--primary);
   }
 
   .totem-header h1 {

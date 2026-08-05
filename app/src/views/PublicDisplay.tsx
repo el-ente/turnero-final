@@ -52,7 +52,7 @@ export function PublicDisplay() {
       <div className="display-body">
         <div className="display-main">
           {currentTurn ? (
-            <div className="now-serving">
+            <div className="now-serving tear-edge">
               <span className="now-label">Ahora atendiendo</span>
               <div className="now-number">{currentTurn.currentTurnNumber}</div>
               <div className="now-terminal">
@@ -61,7 +61,7 @@ export function PublicDisplay() {
               </div>
             </div>
           ) : (
-            <div className="now-serving now-empty">
+            <div className="now-serving now-empty tear-edge">
               <span className="now-label">Sin turnos llamados</span>
               <div className="now-number empty-dash">—</div>
             </div>
@@ -154,11 +154,13 @@ export function PublicDisplay() {
 
         .now-serving {
           text-align: center;
-          padding: 3rem;
+          padding: 3.75rem 3rem 3rem;
           background: rgba(250,247,242,0.04);
           border: 1px solid rgba(250,247,242,0.08);
-          border-radius: 24px;
+          border-radius: 6px 6px 24px 24px;
           min-width: 400px;
+          --tear-bg: #2D2926;
+          --tear-dash: rgba(250,247,242,0.18);
         }
 
         .now-label {

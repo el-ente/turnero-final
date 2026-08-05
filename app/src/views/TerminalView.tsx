@@ -13,6 +13,15 @@ import {
 } from "../lib/api";
 import { toDate } from "../lib/dates";
 
+const STATUS_LABELS: Record<string, string> = {
+  waiting: "Esperando",
+  called: "Llamado",
+  attending: "En atención",
+  finished: "Finalizado",
+  no_show: "No presentado",
+  cancelled: "Cancelado",
+};
+
 export function TerminalView() {
   const { terminalId } = useParams<{ terminalId: string }>();
   if (!terminalId) return <Navigate to="/terminal" replace />;
@@ -197,13 +206,13 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
 
       {/* Main */}
       <main className="term-main">
-        <div className="term-current">
+        <div className="term-current tear-edge">
           {currentTurn ? (
             <>
               <span className="term-current-label">Atendiendo</span>
               <div className="term-current-number">{currentTurn.currentTurnNumber}</div>
               <span className={`term-status-pill term-status-${currentTurn.status}`}>
-                {currentTurn.status}
+                {STATUS_LABELS[currentTurn.status] ?? currentTurn.status}
               </span>
               {currentTurn.recallCount > 0 && (
                 <span className="term-recall-badge">Reintentos: {currentTurn.recallCount}</span>
@@ -312,18 +321,27 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           margin: 0.25rem 0;
         }
 
+        /* Base buttons read as physical counter controls: a bottom "lip"
+           that flattens on press, like a bell-push. Secondary/exception
+           actions (outline, danger) stay flat and quiet by contrast. */
         .term-btn {
-          padding: 0.75rem 1rem;
+          padding: 0.8rem 1rem;
           border: 1px solid var(--border);
           border-radius: var(--radius-sm);
           cursor: pointer;
           font-family: var(--font-body);
           font-size: 0.9rem;
-          font-weight: 500;
-          transition: all 0.15s ease;
+          font-weight: 600;
           text-align: left;
           background: var(--surface);
           color: var(--text);
+          box-shadow: 0 3px 0 var(--border);
+          transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .term-btn:active:not(:disabled) {
+          transform: translateY(3px);
+          box-shadow: 0 0 0 var(--border);
         }
 
         .term-btn:disabled {
@@ -335,12 +353,15 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           background: var(--primary);
           border-color: var(--primary);
           color: white;
-          font-weight: 600;
+          box-shadow: 0 3px 0 var(--primary-hover);
         }
 
         .term-btn-primary:hover:not(:disabled) {
           background: var(--primary-hover);
-          box-shadow: 0 2px 8px rgba(212,96,58,0.25);
+        }
+
+        .term-btn-primary:active:not(:disabled) {
+          box-shadow: 0 0 0 var(--primary-hover);
         }
 
         .term-btn-default:hover:not(:disabled) {
@@ -352,16 +373,26 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           background: var(--secondary);
           border-color: var(--secondary);
           color: white;
+          box-shadow: 0 3px 0 #4e7a51;
         }
 
         .term-btn-success:hover:not(:disabled) {
           background: #4e7a51;
         }
 
+        .term-btn-success:active:not(:disabled) {
+          box-shadow: 0 0 0 #4e7a51;
+        }
+
         .term-btn-outline {
           background: transparent;
           border-color: var(--border);
           color: var(--text-muted);
+          box-shadow: none;
+        }
+
+        .term-btn-outline:active:not(:disabled) {
+          transform: translateY(1px);
         }
 
         .term-btn-outline:hover:not(:disabled) {
@@ -374,6 +405,11 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           background: transparent;
           border-color: var(--border);
           color: var(--danger);
+          box-shadow: none;
+        }
+
+        .term-btn-danger:active:not(:disabled) {
+          transform: translateY(1px);
         }
 
         .term-btn-danger:hover:not(:disabled) {
@@ -398,8 +434,8 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           justify-content: center;
           background: var(--surface);
           border: 1px solid var(--border);
-          border-radius: var(--radius-lg);
-          padding: 3rem;
+          border-radius: 6px 6px var(--radius-lg) var(--radius-lg);
+          padding: 3.75rem 3rem 3rem;
           gap: 1rem;
         }
 
