@@ -19,6 +19,14 @@ function getTodayMidnightInArgentina(): Date {
   return new Date(midnight.getTime() - (ARGENTINA_OFFSET + now.getTimezoneOffset()) * 60000);
 }
 
+// Turn's Date-typed fields arrive as Firestore Timestamps at runtime (Admin SDK
+// doesn't convert them), not native Dates — mirrors app/src/lib/dates.ts on the client.
+function toMillis(value: Date | { toDate(): Date }): number {
+  return typeof (value as { toDate?: () => Date }).toDate === "function" ?
+    (value as { toDate(): Date }).toDate().getTime() :
+    (value as Date).getTime();
+}
+
 export interface QueueStats {
   queueId: string;
   totalTodayCreated: number;
@@ -67,7 +75,7 @@ export async function getQueueStats(queueId: string): Promise<QueueStats> {
 
     // Calculate avg wait time for finished turns
     if (turn.status === TurnStatus.FINISHED && turn.calledAt && turn.createdAt) {
-      const waitTime = turn.calledAt.getTime() - turn.createdAt.getTime();
+      const waitTime = toMillis(turn.calledAt) - toMillis(turn.createdAt);
       totalWaitTime += waitTime;
       finishedTurnsCount++;
     }
