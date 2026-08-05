@@ -42,6 +42,7 @@ export function AdminView() {
   const [modal, setModal] = useState<ModalMode>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
 
   const showToast = (type: "success" | "error", text: string) => {
     setToast({ type, text });
@@ -56,6 +57,8 @@ export function AdminView() {
       setTerminals(t);
     } catch (err) {
       showToast("error", "Error cargando datos");
+    } finally {
+      setLoadingData(false);
     }
   };
 
@@ -68,6 +71,16 @@ export function AdminView() {
       setSelectedQueueId(queueId);
       setTab("stats");
     } catch { showToast("error", "Error obteniendo estadísticas"); }
+  };
+
+  const handleToggleQueueActive = async (queue: Queue) => {
+    try {
+      await apiUpdateQueue(queue.id, { active: queue.active === false });
+      showToast("success", queue.active === false ? "Cola reabierta" : "Cola cerrada a turnos nuevos");
+      loadData();
+    } catch (e) {
+      showToast("error", e instanceof Error ? e.message : "Error");
+    }
   };
 
   const getSectorName = (sectorId: string) => sectors.find((s) => s.id === sectorId)?.name || sectorId;
@@ -104,10 +117,22 @@ export function AdminView() {
               </div>
               <button className="adm-btn-new" onClick={() => setModal({ type: "create-queue" })}>+ Nueva Cola</button>
             </div>
-            {queues.length === 0 ? (
+            {loadingData ? (
+              <div className="adm-empty"><p className="adm-empty-title">Cargando...</p></div>
+            ) : queues.length === 0 ? (
               <div className="adm-empty">
-                <p className="adm-empty-title">Todavía no hay colas.</p>
-                <p className="adm-empty-sub">Creá la primera para empezar a atender turnos.</p>
+                {sectors.length === 0 ? (
+                  <>
+                    <p className="adm-empty-title">Primero necesitás un sector.</p>
+                    <p className="adm-empty-sub">Las colas pertenecen a un sector — creá uno en la pestaña Sectores y volvé acá.</p>
+                    <button className="adm-empty-link" onClick={() => setTab("sectors")}>Ir a Sectores →</button>
+                  </>
+                ) : (
+                  <>
+                    <p className="adm-empty-title">Todavía no hay colas.</p>
+                    <p className="adm-empty-sub">Creá la primera para empezar a atender turnos.</p>
+                  </>
+                )}
               </div>
             ) : (
             <div className="adm-table-wrap">
@@ -118,6 +143,7 @@ export function AdminView() {
                     <th>Tipo</th>
                     <th>Sector</th>
                     <th>Reencolar</th>
+                    <th>Estado</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
@@ -131,6 +157,15 @@ export function AdminView() {
                         <span className={`adm-pill ${queue.reenqueueConfig?.enabled ? "adm-pill-on" : "adm-pill-off"}`}>
                           {queue.reenqueueConfig?.enabled ? "Sí" : "No"}
                         </span>
+                      </td>
+                      <td>
+                        <button
+                          className={`adm-pill adm-pill-toggle ${queue.active !== false ? "adm-pill-on" : "adm-pill-off"}`}
+                          onClick={() => handleToggleQueueActive(queue)}
+                          title={queue.active !== false ? "Cerrar cola a turnos nuevos" : "Reabrir cola"}
+                        >
+                          {queue.active !== false ? "Activa" : "Cerrada"}
+                        </button>
                       </td>
                       <td className="adm-actions-cell">
                         <button className="adm-link-btn" onClick={() => handleGetStats(queue.id)}>Stats</button>
@@ -156,10 +191,22 @@ export function AdminView() {
               </div>
               <button className="adm-btn-new" onClick={() => setModal({ type: "create-terminal" })}>+ Nueva Terminal</button>
             </div>
-            {terminals.length === 0 ? (
+            {loadingData ? (
+              <div className="adm-empty"><p className="adm-empty-title">Cargando...</p></div>
+            ) : terminals.length === 0 ? (
               <div className="adm-empty">
-                <p className="adm-empty-title">Todavía no hay terminales.</p>
-                <p className="adm-empty-sub">Creá una para que un operador pueda empezar a atender.</p>
+                {queues.length === 0 ? (
+                  <>
+                    <p className="adm-empty-title">Primero necesitás una cola.</p>
+                    <p className="adm-empty-sub">Una terminal atiende colas — creá una en la pestaña Colas y volvé acá.</p>
+                    <button className="adm-empty-link" onClick={() => setTab("queues")}>Ir a Colas →</button>
+                  </>
+                ) : (
+                  <>
+                    <p className="adm-empty-title">Todavía no hay terminales.</p>
+                    <p className="adm-empty-sub">Creá una para que un operador pueda empezar a atender.</p>
+                  </>
+                )}
               </div>
             ) : (
             <div className="adm-table-wrap">
@@ -203,7 +250,9 @@ export function AdminView() {
               </div>
               <button className="adm-btn-new" onClick={() => setModal({ type: "create-sector" })}>+ Nuevo Sector</button>
             </div>
-            {sectors.length === 0 ? (
+            {loadingData ? (
+              <div className="adm-empty"><p className="adm-empty-title">Cargando...</p></div>
+            ) : sectors.length === 0 ? (
               <div className="adm-empty">
                 <p className="adm-empty-title">Todavía no hay sectores.</p>
                 <p className="adm-empty-sub">Creá uno para empezar a organizar tus colas.</p>
@@ -427,6 +476,7 @@ function SectorFormModal({ sector, onClose, onSave, saving }: {
         <label className="form-label">Descripción</label>
         <input className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" />
       </div>
+      {!name.trim() && <p className="form-hint">Completá el nombre para guardar.</p>}
       <div className="form-actions">
         <button className="form-btn form-btn-cancel" onClick={onClose}>Cancelar</button>
         <button className="form-btn form-btn-save" disabled={!name.trim() || saving} onClick={() => onSave({ name: name.trim(), description: description.trim() || undefined })}>
@@ -496,6 +546,11 @@ function QueueFormModal({ queue, sectors, onClose, onSave, saving }: {
             <input className="form-input" type="number" min={1} value={positionsBack} onChange={(e) => setPositionsBack(Number(e.target.value))} />
           </div>
         </div>
+      )}
+      {!name.trim() ? (
+        <p className="form-hint">Completá el nombre para guardar.</p>
+      ) : !sectorId && (
+        <p className="form-hint">Seleccioná un sector para guardar.</p>
       )}
       <div className="form-actions">
         <button className="form-btn form-btn-cancel" onClick={onClose}>Cancelar</button>
@@ -592,6 +647,7 @@ function TerminalFormModal({ terminal, sectors, queues, onClose, onSave, saving 
           </div>
         </div>
       )}
+      {!name.trim() && <p className="form-hint">Completá el nombre para guardar.</p>}
       <div className="form-actions">
         <button className="form-btn form-btn-cancel" onClick={onClose}>Cancelar</button>
         <button className="form-btn form-btn-save" disabled={!name.trim() || saving} onClick={() => {
@@ -758,6 +814,24 @@ const adminStyles = `
     font-weight: 500;
   }
 
+  .adm-empty-link {
+    margin-top: 1rem;
+    padding: 0.5rem 1.1rem;
+    background: transparent;
+    border: 1px solid var(--primary);
+    border-radius: var(--radius-sm);
+    color: var(--primary);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .adm-empty-link:hover {
+    background: var(--primary-light);
+  }
+
   .adm-btn-new {
     padding: 0.6rem 1.25rem;
     background: var(--primary);
@@ -830,6 +904,15 @@ const adminStyles = `
   .adm-pill-available { background: var(--secondary-light); color: var(--secondary); }
   .adm-pill-busy { background: var(--accent-light); color: var(--accent); }
   .adm-pill-offline { background: var(--danger-light); color: var(--danger); }
+
+  .adm-pill-toggle {
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-body);
+    transition: opacity 0.15s ease;
+  }
+
+  .adm-pill-toggle:hover { opacity: 0.75; }
 
   .adm-actions-cell {
     display: flex;

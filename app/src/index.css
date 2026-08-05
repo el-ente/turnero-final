@@ -64,6 +64,11 @@ h1, h2, h3 {
   letter-spacing: -0.02em;
 }
 
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /*
   Shared "torn ticket" signature: a perforated edge + dashed tear line,
   reused across every screen's focal panel. --tear-bg must match the

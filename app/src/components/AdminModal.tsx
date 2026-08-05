@@ -130,6 +130,12 @@ export function AdminModal({ title, onClose, children }: Props) {
           accent-color: var(--primary);
         }
 
+        .form-hint {
+          color: var(--text-muted);
+          font-size: 0.8rem;
+          margin-top: -0.75rem;
+        }
+
         .form-actions {
           display: flex;
           gap: 0.75rem;
