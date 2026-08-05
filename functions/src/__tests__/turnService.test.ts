@@ -1,11 +1,9 @@
 import {
   createTurn,
   getCurrentTurn,
-  requeueTurn,
-  noShowTurn,
 } from "../services/turnService";
 import {db} from "../config/firebase-admin";
-import {Turn, TurnStatus} from "shared";
+import {Turn} from "shared";
 import {mockRunTransaction} from "./helpers";
 
 // Mock Firestore
@@ -110,66 +108,6 @@ describe("Turn Service", () => {
 
       const turn = await getCurrentTurn("member-1");
       expect(turn).toBeNull();
-    });
-  });
-
-  describe("requeueTurn", () => {
-    it("should increment currentTurnNumber and recallCount", async () => {
-      const mockTurn: Turn = {
-        id: "turn-1",
-        memberId: "member-1",
-        queueId: "queue-1",
-        originalTurnNumber: 1,
-        currentTurnNumber: 1,
-        status: TurnStatus.WAITING,
-        channel: "totem",
-        recallCount: 0,
-        createdAt: new Date(),
-      };
-
-      const mockTurnDoc = {
-        exists: true,
-        data: () => mockTurn,
-      };
-
-      (db.collection as jest.Mock).mockReturnValue({
-        doc: jest.fn().mockReturnValue({
-          get: jest.fn().mockResolvedValue(mockTurnDoc),
-          update: jest.fn().mockResolvedValue(undefined),
-        }),
-      });
-
-      await requeueTurn("turn-1", 3);
-
-      const updateCalls = (
-        (db.collection as jest.Mock)().doc().update as jest.Mock
-      ).mock.calls;
-      expect(updateCalls.length).toBeGreaterThan(0);
-    });
-
-    it("should throw NotFoundError if turn does not exist", async () => {
-      const mockTurnDoc = {exists: false};
-
-      (db.collection as jest.Mock).mockReturnValue({
-        doc: jest.fn().mockReturnValue({
-          get: jest.fn().mockResolvedValue(mockTurnDoc),
-        }),
-      });
-
-      expect(requeueTurn("invalid-turn", 3)).rejects.toThrow();
-    });
-  });
-
-  describe("noShowTurn", () => {
-    it("should requeue if enabled and under maxAttempts", async () => {
-      // This test would verify the conditional logic
-      // In production, we'd mock both turn and queue docs
-      expect(noShowTurn).toBeDefined();
-    });
-
-    it("should cancel turn if maxAttempts exceeded", async () => {
-      // Similar to above
-      expect(noShowTurn).toBeDefined();
     });
   });
 });

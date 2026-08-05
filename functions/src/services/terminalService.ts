@@ -1,8 +1,8 @@
-import {Turn, TurnStatus, Terminal, ServingStrategy} from "shared";
+import {Turn, TurnStatus, Terminal, ServingStrategy, Queue} from "shared";
 import {db} from "../config/firebase-admin";
 import {NotFoundError, ConflictError} from "../utils/errors";
 import {getWaitingTurnsAcrossQueues} from "./queueService";
-import {updateTurnStatus, noShowTurn} from "./turnService";
+import {updateTurnStatus} from "./turnService";
 
 export async function getNextTurn(terminalId: string): Promise<Turn | null> {
   const terminalDoc = await db.collection("terminals").doc(terminalId).get();
@@ -88,29 +88,32 @@ async function getNextTurnRatioBased(terminal: Terminal): Promise<Turn | null> {
 }
 
 export async function callTurn(terminalId: string, turnId: string): Promise<void> {
-  const terminalDoc = await db.collection("terminals").doc(terminalId).get();
-  if (!terminalDoc.exists) {
-    throw new NotFoundError(`Terminal ${terminalId} not found`);
-  }
-
-  const turnDoc = await db.collection("turns").doc(turnId).get();
-  if (!turnDoc.exists) {
-    throw new NotFoundError(`Turn ${turnId} not found`);
-  }
-
-  const turn = turnDoc.data() as Turn;
-  if (turn.status !== TurnStatus.WAITING) {
-    throw new ConflictError(`Turn is not in WAITING status (current: ${turn.status})`);
-  }
-
   await db.runTransaction(async (transaction) => {
-    transaction.update(db.collection("turns").doc(turnId), {
+    const terminalRef = db.collection("terminals").doc(terminalId);
+    const turnRef = db.collection("turns").doc(turnId);
+
+    const terminalDoc = await transaction.get(terminalRef);
+    if (!terminalDoc.exists) {
+      throw new NotFoundError(`Terminal ${terminalId} not found`);
+    }
+
+    const turnDoc = await transaction.get(turnRef);
+    if (!turnDoc.exists) {
+      throw new NotFoundError(`Turn ${turnId} not found`);
+    }
+
+    const turn = turnDoc.data() as Turn;
+    if (turn.status !== TurnStatus.WAITING) {
+      throw new ConflictError(`Turn is not in WAITING status (current: ${turn.status})`);
+    }
+
+    transaction.update(turnRef, {
       status: TurnStatus.CALLED,
       calledAt: new Date(),
       terminalId,
     });
 
-    transaction.update(db.collection("terminals").doc(terminalId), {
+    transaction.update(terminalRef, {
       currentTurnId: turnId,
     });
   });
@@ -194,26 +197,51 @@ export async function recallTurn(terminalId: string, turnId: string): Promise<vo
 }
 
 export async function handleNoShow(terminalId: string, turnId: string): Promise<void> {
-  const terminalDoc = await db.collection("terminals").doc(terminalId).get();
-  if (!terminalDoc.exists) {
-    throw new NotFoundError(`Terminal ${terminalId} not found`);
-  }
-
-  const turnDoc = await db.collection("turns").doc(turnId).get();
-  if (!turnDoc.exists) {
-    throw new NotFoundError(`Turn ${turnId} not found`);
-  }
-
-  const turn = turnDoc.data() as Turn;
-  if (turn.status !== TurnStatus.CALLED) {
-    throw new ConflictError(`Turn is not in CALLED status (current: ${turn.status})`);
-  }
-
   await db.runTransaction(async (transaction) => {
-    await noShowTurn(turnId);
+    const terminalRef = db.collection("terminals").doc(terminalId);
+    const turnRef = db.collection("turns").doc(turnId);
+
+    const terminalDoc = await transaction.get(terminalRef);
+    if (!terminalDoc.exists) {
+      throw new NotFoundError(`Terminal ${terminalId} not found`);
+    }
+
+    const turnDoc = await transaction.get(turnRef);
+    if (!turnDoc.exists) {
+      throw new NotFoundError(`Turn ${turnId} not found`);
+    }
+
+    const turn = turnDoc.data() as Turn;
+    if (turn.status !== TurnStatus.CALLED) {
+      throw new ConflictError(`Turn is not in CALLED status (current: ${turn.status})`);
+    }
+
+    const queueRef = db.collection("queues").doc(turn.queueId);
+    const queueDoc = await transaction.get(queueRef);
+    if (!queueDoc.exists) {
+      throw new NotFoundError(`Queue ${turn.queueId} not found`);
+    }
+
+    const queue = queueDoc.data() as Queue;
+    const config = queue.reenqueueConfig;
+
+    if (config.enabled && turn.recallCount < config.maxAttempts) {
+      // Requeue the turn
+      transaction.update(turnRef, {
+        currentTurnNumber: turn.currentTurnNumber + config.positionsBack,
+        status: TurnStatus.WAITING,
+        recallCount: turn.recallCount + 1,
+        lastRequeueAt: new Date(),
+      });
+    } else {
+      // Cancel the turn
+      transaction.update(turnRef, {
+        status: TurnStatus.CANCELLED,
+      });
+    }
 
     // Clear terminal's current turn
-    transaction.update(db.collection("terminals").doc(terminalId), {
+    transaction.update(terminalRef, {
       currentTurnId: "",
     });
   });
