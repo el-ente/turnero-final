@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import type { Turn, Queue } from "shared";
-import { createTurn, getCurrentTurn } from "../lib/api";
+import { createTurn, getCurrentTurn, cancelTurn } from "../lib/api";
 import { toDate } from "../lib/dates";
 import { db } from "../lib/firebase";
-import { collection, getDocs, query, doc, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, onSnapshot } from "firebase/firestore";
 import { TicketMark } from "../components/TicketMark";
 
 function getOrCreateMemberId(): string {
@@ -38,7 +38,9 @@ export function TotemView() {
       try {
         const q = query(collection(db, "queues"));
         const snapshot = await getDocs(q);
-        const queueList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Queue);
+        const queueList = snapshot.docs
+          .map((d) => ({ id: d.id, ...d.data() }) as Queue)
+          .filter((queue) => queue.active !== false);
         setQueues(queueList);
         if (queueList.length > 0 && !selectedQueueId) {
           setSelectedQueueId(queueList[0].id);
@@ -89,6 +91,27 @@ export function TotemView() {
     return unsubscribe;
   }, [currentTurn?.id]);
 
+  // Live count of waiting turns ahead of this one in the same queue
+  const [aheadCount, setAheadCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!currentTurn || currentTurn.status !== "waiting") {
+      setAheadCount(null);
+      return;
+    }
+    const q = query(
+      collection(db, "turns"),
+      where("queueId", "==", currentTurn.queueId),
+      where("status", "==", "waiting")
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const ahead = snapshot.docs
+        .map((d) => d.data() as Turn)
+        .filter((t) => t.currentTurnNumber < currentTurn.currentTurnNumber).length;
+      setAheadCount(ahead);
+    });
+    return unsubscribe;
+  }, [currentTurn?.queueId, currentTurn?.status, currentTurn?.currentTurnNumber]);
+
   const handleTakeTurn = async () => {
     if (!selectedQueueId) {
       setError("Seleccioná una cola");
@@ -113,6 +136,19 @@ export function TotemView() {
     setStatus("selecting");
     setMemberId(resetMemberId());
     setError("");
+  };
+
+  const handleCancelTurn = async () => {
+    if (!currentTurn) return;
+    setLoading(true);
+    try {
+      await cancelTurn(currentTurn.id);
+      handleNewTurn();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cancelar turno");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (checkingExisting) {
@@ -153,6 +189,12 @@ export function TotemView() {
             </div>
           )}
 
+          {queues.find((q) => q.id === selectedQueueId)?.type === "priority" && (
+            <p className="totem-priority-note">
+              Para personas mayores, embarazadas o con discapacidad.
+            </p>
+          )}
+
           {error && <div className="totem-error">{error}</div>}
 
           <button
@@ -178,6 +220,12 @@ export function TotemView() {
     return (
       <div className="totem">
         <div className={`ticket-card ${isCalled ? "ticket-called" : ""}`}>
+          {currentTurn.status === "waiting" && (
+            <button className="ticket-not-you" onClick={handleNewTurn}>
+              ¿No sos vos? Sacar mi turno
+            </button>
+          )}
+
           <div className="ticket-top">
             <span className="ticket-label">Tu turno</span>
             <div className="ticket-number">{currentTurn.currentTurnNumber}</div>
@@ -202,6 +250,11 @@ export function TotemView() {
             {currentTurn.terminalId && isCalled && (
               <div className="ticket-terminal">Dirigite al terminal</div>
             )}
+            {currentTurn.status === "waiting" && aheadCount !== null && (
+              <div className="ticket-position">
+                {aheadCount === 0 ? "Sos el próximo" : `${aheadCount} persona${aheadCount !== 1 ? "s" : ""} por delante tuyo`}
+              </div>
+            )}
             <div className="ticket-time">
               {toDate(currentTurn.createdAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
             </div>
@@ -209,6 +262,12 @@ export function TotemView() {
               <div className="ticket-recall">Rellamado {currentTurn.recallCount}x</div>
             )}
           </div>
+
+          {currentTurn.status === "waiting" && (
+            <button className="ticket-cancel" onClick={handleCancelTurn} disabled={loading}>
+              {loading ? "Cancelando..." : "Cancelar turno"}
+            </button>
+          )}
 
           {isEnded && (
             <button className="totem-submit" onClick={handleNewTurn}>
@@ -358,6 +417,13 @@ const selectingStyles = `
     border-radius: 999px;
   }
 
+  .totem-priority-note {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: -0.75rem 0 1rem;
+    padding: 0 0.25rem;
+  }
+
   .totem-error {
     color: var(--danger);
     background: var(--danger-light);
@@ -378,6 +444,7 @@ const selectingStyles = `
 
 const ticketStyles = `
   .ticket-card {
+    position: relative;
     width: 100%;
     max-width: 400px;
     background: var(--surface);
@@ -387,6 +454,25 @@ const ticketStyles = `
     box-shadow: var(--shadow-lg);
     animation: ticket-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .ticket-not-you {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    color: var(--text-light);
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0.25rem;
+    z-index: 1;
+  }
+
+  .ticket-not-you:hover {
+    color: var(--text-muted);
   }
 
   .ticket-called {
@@ -491,6 +577,40 @@ const ticketStyles = `
     font-weight: 500;
     color: var(--text-muted);
     margin-bottom: 0.25rem;
+  }
+
+  .ticket-position {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--secondary);
+    margin-bottom: 0.25rem;
+  }
+
+  .ticket-cancel {
+    display: block;
+    width: calc(100% - 3rem);
+    margin: 0 1.5rem 1.5rem;
+    padding: 0.7rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .ticket-cancel:hover:not(:disabled) {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: var(--danger-light);
+  }
+
+  .ticket-cancel:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .ticket-time {
