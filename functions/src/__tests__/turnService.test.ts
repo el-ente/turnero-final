@@ -17,13 +17,20 @@ describe("Turn Service", () => {
 
   describe("createTurn", () => {
     // Sets up db.collection so "queues" resolves to an existing queue doc,
-    // and "turns" resolves to a doc() that returns a fresh ref with a plain
-    // set() spy (createTurn no longer uses a transaction).
-    function mockQueueExists() {
+    // and "turns" resolves to both a doc() (plain set() spy — createTurn no
+    // longer uses a transaction) and the where().where().where().limit().get()
+    // chain used by the same-queue duplicate check. Defaults to "no existing
+    // active turn found" so existing creation tests are unaffected.
+    function mockQueueExists(existingActiveTurn: Turn | null = null) {
       const setSpy = jest.fn().mockResolvedValue(undefined);
       const turnRef = {id: "new-turn-id", set: setSpy};
       const turnsCollection = {
         doc: jest.fn().mockReturnValue(turnRef),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        get: jest.fn().mockResolvedValue(existingActiveTurn ?
+          {empty: false, docs: [{data: () => existingActiveTurn}]} :
+          {empty: true, docs: []}),
       };
 
       (db.collection as jest.Mock).mockImplementation((name: string) => {
@@ -40,7 +47,7 @@ describe("Turn Service", () => {
         throw new Error(`Unexpected collection: ${name}`);
       });
 
-      return {setSpy};
+      return {setSpy, turnsCollection};
     }
 
     it("returns the createdAt that was actually written via set()", async () => {
@@ -64,6 +71,38 @@ describe("Turn Service", () => {
       });
 
       expect(createTurn("invalid-queue", 4213)).rejects.toThrow();
+    });
+
+    describe("same-queue duplicate guard", () => {
+      it("returns the existing active turn instead of creating a new one", async () => {
+        const existing: Turn = {
+          id: "existing-turn",
+          memberNumber: 4213,
+          queueId: "queue-1",
+          queuedAt: new Date("2026-01-01T10:00:00Z"),
+          status: TurnStatus.WAITING,
+          channel: "totem",
+          recallCount: 0,
+          createdAt: new Date("2026-01-01T10:00:00Z"),
+        };
+        const {setSpy} = mockQueueExists(existing);
+
+        const result = await createTurn("queue-1", 4213);
+
+        expect(result).toEqual(existing);
+        expect(setSpy).not.toHaveBeenCalled();
+      });
+
+      it("scopes the duplicate check to memberNumber AND queueId (not memberNumber alone)", async () => {
+        const {setSpy, turnsCollection} = mockQueueExists(null);
+
+        const result = await createTurn("queue-1", 4213);
+
+        expect(turnsCollection.where).toHaveBeenCalledWith("memberNumber", "==", 4213);
+        expect(turnsCollection.where).toHaveBeenCalledWith("queueId", "==", "queue-1");
+        expect(setSpy).toHaveBeenCalledTimes(1);
+        expect(result.queueId).toBe("queue-1");
+      });
     });
 
     describe("memberNumber validation", () => {

@@ -13,6 +13,19 @@ export async function createTurn(
   const queueDoc = await db.collection("queues").doc(queueId).get();
   if (!queueDoc.exists) throw new NotFoundError(`Queue ${queueId} not found`);
 
+  // Same-queue duplicate guard: a second ticket in the same queue isn't a new
+  // need, just a repeat of the same one — keep the existing (older) ticket,
+  // which already has earned position, instead of creating a fresh one.
+  const existingSnap = await db.collection("turns")
+    .where("memberNumber", "==", memberNumber)
+    .where("queueId", "==", queueId)
+    .where("status", "in", [TurnStatus.WAITING, TurnStatus.CALLED, TurnStatus.ATTENDING])
+    .limit(1)
+    .get();
+  if (!existingSnap.empty) {
+    return existingSnap.docs[0].data() as Turn;
+  }
+
   const turnRef = db.collection("turns").doc();
   const createdAt = new Date();
   const newTurn: Turn = {
