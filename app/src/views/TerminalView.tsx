@@ -15,8 +15,11 @@ import { toDate } from "../lib/dates";
 
 export function TerminalView() {
   const { terminalId } = useParams<{ terminalId: string }>();
-
   if (!terminalId) return <Navigate to="/terminal" replace />;
+  return <TerminalViewContent terminalId={terminalId} />;
+}
+
+function TerminalViewContent({ terminalId }: { terminalId: string }) {
   const [terminal, setTerminal] = useState<Terminal | null>(null);
   const [currentTurn, setCurrentTurn] = useState<Turn | null>(null);
   const [waitingTurns, setWaitingTurns] = useState<Turn[]>([]);
