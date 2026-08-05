@@ -115,6 +115,7 @@ export async function createQueue(data: {
     reenqueueConfig: data.reenqueueConfig || {enabled: false, maxAttempts: 3, positionsBack: 5},
     priorityWeight: data.priorityWeight || 1,
     servedBy: [],
+    active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -141,6 +142,7 @@ export async function updateQueue(queueId: string, data: Record<string, any>) {
   if (data.type !== undefined) updateData.type = data.type;
   if (data.reenqueueConfig !== undefined) updateData.reenqueueConfig = data.reenqueueConfig;
   if (data.priorityWeight !== undefined) updateData.priorityWeight = data.priorityWeight;
+  if (data.active !== undefined) updateData.active = data.active;
 
   await ref.update(updateData);
   const updated = await ref.get();

@@ -67,6 +67,7 @@ async function seed() {
       },
       priorityWeight: 2,
       servedBy: ["terminal-1", "terminal-2"],
+      active: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -82,6 +83,7 @@ async function seed() {
         positionsBack: 3,
       },
       servedBy: ["terminal-1"],
+      active: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -97,6 +99,7 @@ async function seed() {
         positionsBack: 0,
       },
       servedBy: ["terminal-2"],
+      active: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

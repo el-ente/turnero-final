@@ -1,6 +1,6 @@
 import {Turn, TurnStatus} from "shared";
 import {db} from "../config/firebase-admin";
-import {NotFoundError} from "../utils/errors";
+import {NotFoundError, ConflictError} from "../utils/errors";
 
 const ARGENTINA_OFFSET = -3 * 60; // UTC-3 in minutes
 
@@ -112,6 +112,26 @@ export async function getTurnById(turnId: string): Promise<Turn | null> {
     return null;
   }
   return turnDoc.data() as Turn;
+}
+
+export async function cancelTurn(turnId: string): Promise<void> {
+  // Transactional so a customer's cancel and an operator's simultaneous
+  // callTurn can't race — whichever commits first is the one that sticks,
+  // and the loser sees the fresh status and errors instead of overwriting it.
+  await db.runTransaction(async (transaction) => {
+    const turnRef = db.collection("turns").doc(turnId);
+    const turnDoc = await transaction.get(turnRef);
+    if (!turnDoc.exists) {
+      throw new NotFoundError(`Turn ${turnId} not found`);
+    }
+
+    const turn = turnDoc.data() as Turn;
+    if (turn.status !== TurnStatus.WAITING) {
+      throw new ConflictError(`Turn is not in WAITING status (current: ${turn.status})`);
+    }
+
+    transaction.update(turnRef, {status: TurnStatus.CANCELLED});
+  });
 }
 
 export async function updateTurnStatus(turnId: string, status: TurnStatus): Promise<void> {

@@ -1,5 +1,5 @@
 import {onRequest} from "firebase-functions/v2/https";
-import {createTurn, getCurrentTurn} from "../services/turnService";
+import {createTurn, getCurrentTurn, cancelTurn} from "../services/turnService";
 import {BusinessError} from "../utils/errors";
 import {logger} from "../config/firebase-admin";
 
@@ -53,5 +53,31 @@ export const getCurrentTurnHandler = onRequest({cors: true}, async (req, res) =>
   } catch (error) {
     logger.error("Error getting current turn:", error);
     res.status(500).json({error: "Internal server error"});
+  }
+});
+
+export const cancelTurnHandler = onRequest({cors: true}, async (req, res) => {
+  try {
+    if (req.method !== "POST") {
+      res.status(405).json({error: "Method not allowed"});
+      return;
+    }
+
+    const {turnId} = req.body;
+
+    if (!turnId) {
+      res.status(400).json({error: "turnId is required"});
+      return;
+    }
+
+    await cancelTurn(turnId);
+    res.status(200).json({success: true});
+  } catch (error) {
+    if (error instanceof BusinessError) {
+      res.status(error.statusCode).json({error: error.message, code: error.code});
+    } else {
+      logger.error("Error cancelling turn:", error);
+      res.status(500).json({error: "Internal server error"});
+    }
   }
 });

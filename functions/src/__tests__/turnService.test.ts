@@ -1,9 +1,10 @@
 import {
   createTurn,
   getCurrentTurn,
+  cancelTurn,
 } from "../services/turnService";
 import {db} from "../config/firebase-admin";
-import {Turn} from "shared";
+import {Turn, TurnStatus} from "shared";
 import {mockRunTransaction} from "./helpers";
 
 // Mock Firestore
@@ -87,6 +88,41 @@ describe("Turn Service", () => {
 
       // This would throw NotFoundError
       expect(createTurn("invalid-queue", "member-1")).rejects.toThrow();
+    });
+  });
+
+  describe("cancelTurn", () => {
+    it("cancels a waiting turn", async () => {
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValue({
+        exists: true,
+        data: () => ({status: TurnStatus.WAITING}),
+      });
+
+      await cancelTurn("turn-1");
+
+      expect(transaction.update).toHaveBeenCalledWith(
+        expect.anything(),
+        {status: TurnStatus.CANCELLED}
+      );
+    });
+
+    it("throws NotFoundError if turn does not exist", async () => {
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValue({exists: false});
+
+      await expect(cancelTurn("invalid-turn")).rejects.toThrow();
+    });
+
+    it("throws ConflictError if turn is not WAITING", async () => {
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValue({
+        exists: true,
+        data: () => ({status: TurnStatus.CALLED}),
+      });
+
+      await expect(cancelTurn("turn-1")).rejects.toThrow();
+      expect(transaction.update).not.toHaveBeenCalled();
     });
   });
 

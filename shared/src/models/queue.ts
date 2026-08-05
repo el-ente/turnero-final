@@ -19,6 +19,7 @@ export interface Queue {
   reenqueueConfig: ReenqueueConfig;
   priorityWeight?: number;
   servedBy: string[]; // terminal IDs
+  active: boolean; // false = closed to new turns, without losing config
   createdAt: Date;
   updatedAt: Date;
 }
