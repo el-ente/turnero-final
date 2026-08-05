@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import type { Turn } from "shared";
+import type { Turn, Terminal, Sector } from "shared";
 import { db } from "../lib/firebase";
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { toDate } from "../lib/dates";
 
 /** Short two-tone chime so a called number doesn't rely purely on the screen being watched. */
@@ -30,37 +30,35 @@ function playChime() {
 
 export function PublicDisplay() {
   const [calledTurns, setCalledTurns] = useState<Turn[]>([]);
-  const [terminalNames, setTerminalNames] = useState<Record<string, string>>({});
+  const [terminals, setTerminals] = useState<Terminal[]>([]);
+  const [sectorNames, setSectorNames] = useState<Record<string, string>>({});
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
     const q = query(
       collection(db, "turns"),
-      where("status", "in", ["called", "attending"]),
-      orderBy("calledAt", "desc")
+      where("status", "in", ["called", "attending"])
     );
-
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const turns = snapshot.docs
-        .map((doc) => doc.data() as Turn)
-        .sort((a, b) => {
-          const timeA = a.calledAt ? toDate(a.calledAt).getTime() : 0;
-          const timeB = b.calledAt ? toDate(b.calledAt).getTime() : 0;
-          return timeB - timeA;
-        });
-      setCalledTurns(turns);
+      setCalledTurns(snapshot.docs.map((doc) => doc.data() as Turn));
     });
-
     return unsubscribe;
   }, []);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "terminals"), (snapshot) => {
+      setTerminals(snapshot.docs.map((d) => d.data() as Terminal));
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "sectors"), (snapshot) => {
       const names: Record<string, string> = {};
       snapshot.docs.forEach((d) => {
-        names[d.id] = (d.data() as { name: string }).name;
+        names[d.id] = (d.data() as Sector).name;
       });
-      setTerminalNames(names);
+      setSectorNames(names);
     });
     return unsubscribe;
   }, []);
@@ -70,17 +68,41 @@ export function PublicDisplay() {
     return () => clearInterval(timer);
   }, []);
 
-  const currentTurn = calledTurns[0];
-  const nextTurns = calledTurns.slice(1, 6);
+  // Every counter calls independently — a busy Pharmacy shouldn't bump a
+  // still-current Perfumería call out of view. One card per open terminal,
+  // each showing only its own latest called/attending turn.
+  const activeTerminals = terminals
+    .filter((t) => t.status !== "offline")
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Chime only on a genuine new call, not on first load of an already-called turn.
-  const prevTurnIdRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (currentTurn?.id && prevTurnIdRef.current !== undefined && currentTurn.id !== prevTurnIdRef.current) {
-      playChime();
+  const latestTurnByTerminal: Record<string, Turn> = {};
+  calledTurns.forEach((turn) => {
+    if (!turn.terminalId) return;
+    const current = latestTurnByTerminal[turn.terminalId];
+    const turnTime = turn.calledAt ? toDate(turn.calledAt).getTime() : 0;
+    const currentTime = current?.calledAt ? toDate(current.calledAt).getTime() : 0;
+    if (!current || turnTime > currentTime) {
+      latestTurnByTerminal[turn.terminalId] = turn;
     }
-    prevTurnIdRef.current = currentTurn?.id;
-  }, [currentTurn?.id]);
+  });
+
+  // Chime per terminal — each counter's own new call rings independently,
+  // instead of one global ref racing across whichever counter called last.
+  const prevTurnIdByTerminal = useRef<Record<string, string | undefined>>({});
+  useEffect(() => {
+    for (const terminal of activeTerminals) {
+      const turn = latestTurnByTerminal[terminal.id];
+      const prev = prevTurnIdByTerminal.current[terminal.id];
+      if (turn?.id && prev !== undefined && turn.id !== prev) {
+        playChime();
+      }
+      prevTurnIdByTerminal.current[terminal.id] = turn?.id;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calledTurns, terminals]);
+
+  const sectorLabel = (terminal: Terminal) =>
+    terminal.sectorIds.map((id) => sectorNames[id]).filter(Boolean).join(" / ");
 
   return (
     <div className="display">
@@ -95,35 +117,30 @@ export function PublicDisplay() {
       </div>
 
       <div className="display-body">
-        <div className="display-main">
-          {currentTurn ? (
-            <div className="now-serving tear-edge">
-              <span className="now-label">Ahora atendiendo</span>
-              <div className="now-number">{currentTurn.memberNumber}</div>
-              <div className="now-terminal">
-                <span className="terminal-icon">◉</span>
-                {(currentTurn.terminalId && terminalNames[currentTurn.terminalId]) || currentTurn.terminalId || "—"}
-              </div>
-            </div>
-          ) : (
-            <div className="now-serving now-empty tear-edge">
-              <span className="now-label">Sin turnos llamados</span>
-              <div className="now-number empty-dash">—</div>
-            </div>
-          )}
-        </div>
-
-        {nextTurns.length > 0 && (
-          <div className="display-sidebar">
-            <div className="sidebar-label">Proximos</div>
-            <div className="sidebar-list">
-              {nextTurns.map((turn, idx) => (
-                <div key={turn.id} className="sidebar-item" style={{ animationDelay: `${idx * 0.08}s` }}>
-                  <span className="sidebar-number">{turn.memberNumber}</span>
-                  <span className="sidebar-terminal">{(turn.terminalId && terminalNames[turn.terminalId]) || turn.terminalId || "—"}</span>
+        {activeTerminals.length === 0 ? (
+          <div className="display-empty">Sin terminales activas</div>
+        ) : (
+          <div className="counter-grid">
+            {activeTerminals.map((terminal) => {
+              const turn = latestTurnByTerminal[terminal.id];
+              const label = sectorLabel(terminal);
+              return (
+                <div key={terminal.id} className={`counter-card tear-edge ${turn ? "" : "counter-idle"}`}>
+                  <div className="counter-header">
+                    <span className="counter-name">{terminal.name}</span>
+                    {label && <span className="counter-sector">{label}</span>}
+                  </div>
+                  {turn ? (
+                    <div className="counter-number">{turn.memberNumber}</div>
+                  ) : (
+                    <div className="counter-number counter-number-empty">—</div>
+                  )}
+                  <span className="counter-status">
+                    {turn ? "Ahora atendiendo" : "Esperando"}
+                  </span>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -186,132 +203,91 @@ export function PublicDisplay() {
           flex: 1;
           display: flex;
           padding: 3rem;
-          gap: 3rem;
           overflow: hidden;
         }
 
-        .display-main {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+        .display-empty {
+          margin: auto;
+          color: rgba(250,247,242,0.3);
+          font-size: 1.5rem;
         }
 
-        .now-serving {
+        .counter-grid {
+          flex: 1;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 2rem;
+          align-content: center;
+        }
+
+        .counter-card {
+          position: relative;
           text-align: center;
-          padding: 3.75rem 3rem 3rem;
+          padding: 2.5rem 1.5rem 2rem;
           background: rgba(250,247,242,0.04);
           border: 1px solid rgba(250,247,242,0.08);
-          border-radius: 6px 6px 24px 24px;
-          min-width: 400px;
+          border-radius: 6px 6px 20px 20px;
           --tear-bg: #2D2926;
           --tear-dash: rgba(250,247,242,0.18);
+          transition: border-color 0.3s ease, background 0.3s ease;
         }
 
-        .now-label {
-          display: block;
-          font-size: 1rem;
-          font-weight: 600;
+        .counter-card:not(.counter-idle) {
+          border-color: rgba(212,96,58,0.4);
+          background: rgba(212,96,58,0.06);
+        }
+
+        .counter-header {
+          display: flex;
+          flex-direction: column;
+          gap: 0.2rem;
+          margin-bottom: 1.25rem;
+        }
+
+        .counter-name {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: rgba(250,247,242,0.85);
+        }
+
+        .counter-sector {
+          font-size: 0.8rem;
+          font-weight: 500;
           text-transform: uppercase;
-          letter-spacing: 0.15em;
-          color: rgba(250,247,242,0.4);
-          margin-bottom: 1rem;
+          letter-spacing: 0.1em;
+          color: rgba(250,247,242,0.35);
         }
 
-        .now-number {
+        .counter-number {
           font-family: 'Fraunces', Georgia, serif;
-          font-size: clamp(8rem, 18vw, 16rem);
+          font-size: clamp(3rem, 7vw, 5.5rem);
           font-weight: 900;
           line-height: 1;
           color: #D4603A;
-          animation: number-appear 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+          animation: number-appear 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+          margin-bottom: 0.75rem;
         }
 
-        .empty-dash {
-          color: rgba(250,247,242,0.1);
+        .counter-number-empty {
+          color: rgba(250,247,242,0.12);
           animation: none;
         }
 
         @keyframes number-appear {
-          from { opacity: 0; transform: scale(0.8); }
+          from { opacity: 0; transform: scale(0.85); }
           to { opacity: 1; transform: scale(1); }
         }
 
-        .now-terminal {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          margin-top: 1.5rem;
-          font-size: 1.1rem;
-          font-weight: 500;
-          color: rgba(250,247,242,0.5);
-          background: rgba(250,247,242,0.06);
-          padding: 0.5rem 1.25rem;
-          border-radius: 999px;
-        }
-
-        .terminal-icon {
-          color: #5B8A5E;
-          font-size: 0.7rem;
-        }
-
-        .now-empty {
-          border-color: rgba(250,247,242,0.05);
-        }
-
-        .display-sidebar {
-          width: 300px;
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-          border-left: 1px solid rgba(250,247,242,0.08);
-          padding-left: 3rem;
-        }
-
-        .sidebar-label {
+        .counter-status {
           font-size: 0.85rem;
           font-weight: 600;
           text-transform: uppercase;
-          letter-spacing: 0.15em;
-          color: rgba(250,247,242,0.3);
+          letter-spacing: 0.1em;
+          color: rgba(250,247,242,0.4);
         }
 
-        .sidebar-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-          flex: 1;
-          justify-content: center;
-        }
-
-        .sidebar-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 1rem 1.25rem;
-          background: rgba(250,247,242,0.04);
-          border: 1px solid rgba(250,247,242,0.06);
-          border-radius: 12px;
-          animation: slide-in 0.4s ease-out forwards;
-          opacity: 0;
-        }
-
-        @keyframes slide-in {
-          from { opacity: 0; transform: translateX(-12px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-
-        .sidebar-number {
-          font-family: 'Fraunces', Georgia, serif;
-          font-size: 2rem;
-          font-weight: 700;
-          color: #E9A84C;
-        }
-
-        .sidebar-terminal {
-          font-size: 0.85rem;
-          color: rgba(250,247,242,0.35);
-          font-weight: 500;
+        .counter-idle .counter-status {
+          color: rgba(250,247,242,0.2);
         }
 
         .display-footer {
@@ -338,28 +314,9 @@ export function PublicDisplay() {
           50% { opacity: 0.3; }
         }
 
-        @media (max-width: 900px) {
-          .display-body {
-            flex-direction: column;
-            padding: 2rem;
-            gap: 2rem;
-          }
-          .display-sidebar {
-            width: 100%;
-            border-left: none;
-            border-top: 1px solid rgba(250,247,242,0.08);
-            padding-left: 0;
-            padding-top: 2rem;
-          }
-          .sidebar-list {
-            flex-direction: row;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-          }
-          .sidebar-item {
-            flex: 1;
-            min-width: 120px;
-          }
+        @media (max-width: 700px) {
+          .display-body { padding: 1.5rem; }
+          .counter-grid { grid-template-columns: 1fr; gap: 1.25rem; }
         }
       `}</style>
     </div>
