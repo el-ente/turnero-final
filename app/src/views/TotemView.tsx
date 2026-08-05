@@ -118,6 +118,19 @@ export function TotemView() {
     setError("");
   };
 
+  const handleTakeAnotherSection = () => {
+    if (!currentTurn) return;
+    setConfirmedMemberNumber(currentTurn.memberNumber);
+    setSelectedQueueId("");
+    setStatus("selecting-queue");
+    setError("");
+  };
+
+  const handleBackToViewing = () => {
+    setStatus("viewing");
+    setError("");
+  };
+
   const handleTakeTurn = async () => {
     if (!selectedQueueId || confirmedMemberNumber === null) {
       setError("Seleccioná una cola");
@@ -206,6 +219,10 @@ export function TotemView() {
   }
 
   if (status === "selecting-queue") {
+    const selectableQueues = currentTurn
+      ? queues.filter((q) => q.id !== currentTurn.queueId)
+      : queues;
+
     return (
       <div className="totem">
         <div className="totem-card">
@@ -217,16 +234,22 @@ export function TotemView() {
 
           <div className="totem-member-confirm">
             <span>Socio N° {confirmedMemberNumber}</span>
-            <button className="totem-change-link" onClick={handleBackToEnteringNumber}>
-              cambiar
-            </button>
+            {currentTurn ? (
+              <button className="totem-change-link" onClick={handleBackToViewing}>
+                volver a mi turno actual
+              </button>
+            ) : (
+              <button className="totem-change-link" onClick={handleBackToEnteringNumber}>
+                cambiar
+              </button>
+            )}
           </div>
 
-          {queues.length === 0 ? (
+          {selectableQueues.length === 0 ? (
             <div className="totem-empty">No hay colas disponibles</div>
           ) : (
             <div className="queue-options">
-              {queues.map((queue) => (
+              {selectableQueues.map((queue) => (
                 <button
                   key={queue.id}
                   className={`queue-option ${selectedQueueId === queue.id ? "selected" : ""}`}
@@ -239,7 +262,7 @@ export function TotemView() {
             </div>
           )}
 
-          {queues.find((q) => q.id === selectedQueueId)?.type === "priority" && (
+          {selectableQueues.find((q) => q.id === selectedQueueId)?.type === "priority" && (
             <p className="totem-priority-note">
               Para personas mayores, embarazadas o con discapacidad.
             </p>
@@ -312,6 +335,12 @@ export function TotemView() {
               <div className="ticket-recall">Rellamado {currentTurn.recallCount}x</div>
             )}
           </div>
+
+          {!isEnded && (
+            <button className="ticket-another-section" onClick={handleTakeAnotherSection}>
+              Sacar turno en otra sección
+            </button>
+          )}
 
           {currentTurn.status === "waiting" && (
             <button className="ticket-cancel" onClick={handleCancelTurn} disabled={loading}>
@@ -693,6 +722,28 @@ const ticketStyles = `
     font-weight: 500;
     color: var(--secondary);
     margin-bottom: 0.25rem;
+  }
+
+  .ticket-another-section {
+    display: block;
+    width: calc(100% - 3rem);
+    margin: 0 1.5rem 0.75rem;
+    padding: 0.7rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .ticket-another-section:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-light);
   }
 
   .ticket-cancel {
