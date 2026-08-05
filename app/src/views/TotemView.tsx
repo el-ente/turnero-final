@@ -9,14 +9,14 @@ function getOrCreateMemberId(): string {
   const key = "totem-member-id";
   const stored = localStorage.getItem(key);
   if (stored) return stored;
-  const id = `member-${Math.random().toString(36).substr(2, 9)}`;
+  const id = `member-${crypto.randomUUID()}`;
   localStorage.setItem(key, id);
   return id;
 }
 
 function resetMemberId(): string {
   const key = "totem-member-id";
-  const id = `member-${Math.random().toString(36).substr(2, 9)}`;
+  const id = `member-${crypto.randomUUID()}`;
   localStorage.setItem(key, id);
   return id;
 }
