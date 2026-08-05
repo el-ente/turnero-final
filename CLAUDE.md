@@ -51,6 +51,10 @@ pnpm -F functions seed:emulator # Populate test data
 - Secrets: `VITE_FIREBASE_*` vars in GitHub Secrets
 - Manual: `firebase deploy --only functions` / `firebase deploy --only hosting:app`
 
+## Documentation
+
+- Keep `README.md` (and the Bruno collection under `bruno/`) in sync with the code — any change to the data model, API request/response shape, or a core business rule (e.g. how tickets are numbered) must update the same doc in the same change, not as a follow-up.
+
 ## Gotchas
 
 - Firestore Timestamps need `.toDate()` conversion (see `app/src/lib/dates.ts`)

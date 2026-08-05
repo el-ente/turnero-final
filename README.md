@@ -111,14 +111,18 @@ Crea datos de prueba: 2 sectores, 3 colas, 2 terminales, 7 turnos.
 
 ### Turn Management
 
+El **número de ticket es el número de socio** (`memberNumber`, entero de 1 a 99999) que el cliente ingresa en el Totem — no es un contador secuencial diario. Es externo y no se valida contra ningún padrón; la app solo verifica el rango.
+
 ```bash
 POST /createTurn
-  { queueId, memberId, channel }
-  → { id, currentTurnNumber, status, ... }
+  { queueId, memberNumber, channel }
+  → { id, memberNumber, status, queuedAt, ... }
 
-GET /getCurrentTurn?memberId=member-1
-  → { id, currentTurnNumber, ... }
+GET /getCurrentTurn?memberNumber=12345
+  → { id, memberNumber, status, ... }
 ```
+
+`getCurrentTurn` es también el mecanismo de recuperación: un socio puede ingresar su número en cualquier Totem y recuperar su turno activo (waiting/called/attending), sin depender de `localStorage` del dispositivo.
 
 ### Terminal Operations
 
@@ -161,7 +165,7 @@ pnpm -F functions test:coverage
 ```bash
 curl -X POST http://localhost:5001/turnero-1212-dev/us-central1/createTurn \
   -H "Content-Type: application/json" \
-  -d '{"queueId":"queue-1", "memberId":"member-1", "channel":"totem"}'
+  -d '{"queueId":"queue-1", "memberNumber":12345, "channel":"totem"}'
 ```
 
 Ver datos en Firestore Emulator UI: http://localhost:4000
@@ -196,9 +200,9 @@ firebase deploy --project dev --only hosting:app
 - **sectors**: { id, name, description, createdAt, updatedAt }
 - **queues**: { id, sectorId, name, type, reenqueueConfig, servedBy[], ... }
 - **terminals**: { id, name, sectorIds[], activeQueueIds[], servingStrategy, ... }
-- **turns**: { id, memberId, queueId, currentTurnNumber, status, ... }
+- **turns**: { id, memberNumber, queueId, status, queuedAt, ... }
 
-Numeración diaria por cola, reset a medianoche Argentina (UTC-3).
+El ticket mostrado en Totem/Display/Terminal **es** `memberNumber` — no hay numeración secuencial diaria ni reset a medianoche. `queuedAt` es la clave de orden interna (= `createdAt` al crear el turno, se adelanta al reencolar por no-show) y reemplaza los antiguos `originalTurnNumber`/`currentTurnNumber`.
 
 ## 🔌 Estrategias de Servicio
 
