@@ -99,7 +99,7 @@ export function PublicDisplay() {
           {currentTurn ? (
             <div className="now-serving tear-edge">
               <span className="now-label">Ahora atendiendo</span>
-              <div className="now-number">{currentTurn.currentTurnNumber}</div>
+              <div className="now-number">{currentTurn.memberNumber}</div>
               <div className="now-terminal">
                 <span className="terminal-icon">◉</span>
                 {(currentTurn.terminalId && terminalNames[currentTurn.terminalId]) || currentTurn.terminalId || "—"}
@@ -119,7 +119,7 @@ export function PublicDisplay() {
             <div className="sidebar-list">
               {nextTurns.map((turn, idx) => (
                 <div key={turn.id} className="sidebar-item" style={{ animationDelay: `${idx * 0.08}s` }}>
-                  <span className="sidebar-number">{turn.currentTurnNumber}</span>
+                  <span className="sidebar-number">{turn.memberNumber}</span>
                   <span className="sidebar-terminal">{(turn.terminalId && terminalNames[turn.terminalId]) || turn.terminalId || "—"}</span>
                 </div>
               ))}

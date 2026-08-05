@@ -56,10 +56,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const turns = snapshot.docs
         .map((doc) => doc.data() as Turn)
-        .sort((a, b) => {
-          const numCmp = a.currentTurnNumber - b.currentTurnNumber;
-          return numCmp !== 0 ? numCmp : toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime();
-        });
+        .sort((a, b) => toDate(a.queuedAt).getTime() - toDate(b.queuedAt).getTime());
       setWaitingTurns(turns);
     });
     return unsubscribe;
@@ -95,7 +92,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
       const turn = await getNextTurn(terminalId);
       if (turn) {
         setCurrentTurn(turn);
-        showMessage("success", `Turno ${turn.currentTurnNumber} seleccionado`);
+        showMessage("success", `Turno ${turn.memberNumber} seleccionado`);
       } else {
         showMessage("error", "No hay turnos disponibles");
       }
@@ -111,7 +108,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     setLoading(true);
     try {
       await callTurn(terminalId, currentTurn.id);
-      showMessage("success", `Turno ${currentTurn.currentTurnNumber} llamado`);
+      showMessage("success", `Turno ${currentTurn.memberNumber} llamado`);
       setLoading(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error";
@@ -259,7 +256,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           {currentTurn ? (
             <>
               <span className="term-current-label">Atendiendo</span>
-              <div className="term-current-number">{currentTurn.currentTurnNumber}</div>
+              <div className="term-current-number">{currentTurn.memberNumber}</div>
               <span className={`term-status-pill term-status-${currentTurn.status}`}>
                 {STATUS_LABELS[currentTurn.status] ?? currentTurn.status}
               </span>
@@ -283,7 +280,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           <div className="term-queue-list">
             {waitingTurns.slice(0, 10).map((turn, idx) => (
               <div key={turn.id} className="term-queue-item" style={{ animationDelay: `${idx * 0.04}s` }}>
-                <span className="term-queue-num">{turn.currentTurnNumber}</span>
+                <span className="term-queue-num">{turn.memberNumber}</span>
                 <span className="term-queue-time">
                   {toDate(turn.createdAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
                 </span>

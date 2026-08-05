@@ -6,33 +6,24 @@ import { db } from "../lib/firebase";
 import { collection, getDocs, query, where, doc, onSnapshot } from "firebase/firestore";
 import { TicketMark } from "../components/TicketMark";
 
-function getOrCreateMemberId(): string {
-  const key = "totem-member-id";
-  const stored = localStorage.getItem(key);
-  if (stored) return stored;
-  const id = `member-${crypto.randomUUID()}`;
-  localStorage.setItem(key, id);
-  return id;
-}
-
-function resetMemberId(): string {
-  const key = "totem-member-id";
-  const id = `member-${crypto.randomUUID()}`;
-  localStorage.setItem(key, id);
-  return id;
-}
-
 export function TotemView() {
   const [queues, setQueues] = useState<Queue[]>([]);
   const [selectedQueueId, setSelectedQueueId] = useState<string>("");
-  const [memberId, setMemberId] = useState<string>(getOrCreateMemberId);
+  const [memberNumberInput, setMemberNumberInput] = useState<string>("");
+  const [confirmedMemberNumber, setConfirmedMemberNumber] = useState<number | null>(null);
   const [currentTurn, setCurrentTurn] = useState<Turn | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
-  const [status, setStatus] = useState<"selecting" | "viewing">("selecting");
-  const [checkingExisting, setCheckingExisting] = useState(true);
+  const [status, setStatus] = useState<"entering-number" | "selecting-queue" | "viewing">("entering-number");
 
-  // Load queues
+  const parsedMemberNumber = Number(memberNumberInput);
+  const isValidMemberNumber =
+    memberNumberInput.length > 0 &&
+    Number.isInteger(parsedMemberNumber) &&
+    parsedMemberNumber >= 1 &&
+    parsedMemberNumber <= 99999;
+
+  // Load queues (in the background, independent of the identity flow)
   useEffect(() => {
     const loadQueues = async () => {
       try {
@@ -52,24 +43,6 @@ export function TotemView() {
     loadQueues();
   }, []);
 
-  // Check for existing active turn on mount
-  useEffect(() => {
-    const checkExisting = async () => {
-      try {
-        const turn = await getCurrentTurn(memberId) as Turn | null;
-        if (turn && ["waiting", "called", "attending"].includes(turn.status)) {
-          setCurrentTurn(turn);
-          setStatus("viewing");
-        }
-      } catch {
-        // No active turn, stay in selecting
-      } finally {
-        setCheckingExisting(false);
-      }
-    };
-    checkExisting();
-  }, [memberId]);
-
   // Real-time listener on active turn
   useEffect(() => {
     if (!currentTurn?.id) return;
@@ -79,12 +52,13 @@ export function TotemView() {
       const turn = { ...snap.data(), id: snap.id } as Turn;
       setCurrentTurn(turn);
 
-      // Turn ended — allow new turn
+      // Turn ended — allow the next kiosk user in, but they must type their own number
       if (["finished", "cancelled", "no_show"].includes(turn.status)) {
         setTimeout(() => {
           setCurrentTurn(null);
-          setStatus("selecting");
-          setMemberId(resetMemberId());
+          setStatus("entering-number");
+          setMemberNumberInput("");
+          setConfirmedMemberNumber(null);
         }, 5000);
       }
     });
@@ -106,22 +80,53 @@ export function TotemView() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ahead = snapshot.docs
         .map((d) => d.data() as Turn)
-        .filter((t) => t.currentTurnNumber < currentTurn.currentTurnNumber).length;
+        .filter((t) => toDate(t.queuedAt).getTime() < toDate(currentTurn.queuedAt).getTime()).length;
       setAheadCount(ahead);
     });
     return unsubscribe;
-  }, [currentTurn?.queueId, currentTurn?.status, currentTurn?.currentTurnNumber]);
+  }, [currentTurn?.queueId, currentTurn?.status, currentTurn?.queuedAt]);
+
+  const handleMemberNumberChange = (value: string) => {
+    setMemberNumberInput(value.replace(/\D/g, "").slice(0, 5));
+  };
+
+  const handleSubmitNumber = async () => {
+    if (!isValidMemberNumber) return;
+    const memberNumber = parsedMemberNumber;
+    setLoading(true);
+    setError("");
+    try {
+      const turn = await getCurrentTurn(memberNumber);
+      if (turn) {
+        setCurrentTurn(turn);
+        setStatus("viewing");
+      } else {
+        setConfirmedMemberNumber(memberNumber);
+        setStatus("selecting-queue");
+      }
+    } catch {
+      // No active turn found for this member number — go pick a queue
+      setConfirmedMemberNumber(memberNumber);
+      setStatus("selecting-queue");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackToEnteringNumber = () => {
+    setStatus("entering-number");
+    setError("");
+  };
 
   const handleTakeTurn = async () => {
-    if (!selectedQueueId) {
+    if (!selectedQueueId || confirmedMemberNumber === null) {
       setError("Seleccioná una cola");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      await createTurn(selectedQueueId, memberId, "totem");
-      const turn = await getCurrentTurn(memberId) as Turn;
+      const turn = await createTurn(selectedQueueId, confirmedMemberNumber, "totem");
       setCurrentTurn(turn);
       setStatus("viewing");
     } catch (err) {
@@ -133,8 +138,9 @@ export function TotemView() {
 
   const handleNewTurn = () => {
     setCurrentTurn(null);
-    setStatus("selecting");
-    setMemberId(resetMemberId());
+    setStatus("entering-number");
+    setMemberNumberInput("");
+    setConfirmedMemberNumber(null);
     setError("");
   };
 
@@ -151,18 +157,55 @@ export function TotemView() {
     }
   };
 
-  if (checkingExisting) {
+  if (status === "entering-number") {
     return (
       <div className="totem">
-        <div className="totem-card" style={{ textAlign: "center", padding: "3rem" }}>
-          <div className="totem-loading">Cargando...</div>
+        <div className="totem-card">
+          <div className="totem-header">
+            <TicketMark size={36} className="totem-icon" />
+            <h1>Sacar turno</h1>
+            <p className="totem-subtitle">Ingresá tu número de socio</p>
+          </div>
+
+          <div className="totem-number-group">
+            <input
+              className="totem-number-input"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={5}
+              value={memberNumberInput}
+              onChange={(e) => handleMemberNumberChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSubmitNumber();
+              }}
+              placeholder="Ej: 4213"
+              autoFocus
+            />
+            {!isValidMemberNumber && (
+              <p className="totem-hint">Ingresá un número de 1 a 5 dígitos.</p>
+            )}
+          </div>
+
+          {error && <div className="totem-error">{error}</div>}
+
+          <button
+            className="totem-submit"
+            onClick={handleSubmitNumber}
+            disabled={loading || !isValidMemberNumber}
+          >
+            {loading ? "Verificando..." : "Continuar"}
+          </button>
         </div>
+
         <style>{totemBaseStyles}</style>
+        <style>{selectingStyles}</style>
+        <style>{numberEntryStyles}</style>
       </div>
     );
   }
 
-  if (status === "selecting") {
+  if (status === "selecting-queue") {
     return (
       <div className="totem">
         <div className="totem-card">
@@ -170,6 +213,13 @@ export function TotemView() {
             <TicketMark size={36} className="totem-icon" />
             <h1>Sacar turno</h1>
             <p className="totem-subtitle">Seleccioná la cola y retirá tu número</p>
+          </div>
+
+          <div className="totem-member-confirm">
+            <span>Socio N° {confirmedMemberNumber}</span>
+            <button className="totem-change-link" onClick={handleBackToEnteringNumber}>
+              cambiar
+            </button>
           </div>
 
           {queues.length === 0 ? (
@@ -228,7 +278,7 @@ export function TotemView() {
 
           <div className="ticket-top">
             <span className="ticket-label">Tu turno</span>
-            <div className="ticket-number">{currentTurn.currentTurnNumber}</div>
+            <div className="ticket-number">{currentTurn.memberNumber}</div>
             <span className="ticket-queue">{queue?.name || currentTurn.queueId}</span>
           </div>
 
@@ -370,6 +420,32 @@ const selectingStyles = `
     font-size: 0.95rem;
   }
 
+  .totem-member-confirm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: -1.25rem 0 1.5rem;
+  }
+
+  .totem-change-link {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .totem-change-link:hover {
+    color: var(--primary-hover);
+  }
+
   .queue-options {
     display: flex;
     flex-direction: column;
@@ -439,6 +515,39 @@ const selectingStyles = `
     color: var(--text-muted);
     padding: 2rem;
     font-size: 0.95rem;
+  }
+`;
+
+const numberEntryStyles = `
+  .totem-number-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .totem-number-input {
+    width: 100%;
+    padding: 1rem 1.25rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.1em;
+    color: var(--text);
+    background: var(--surface);
+    box-sizing: border-box;
+    transition: border-color 0.15s ease;
+  }
+
+  .totem-number-input:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+
+  .totem-hint {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin: 0.5rem 0.25rem 0;
   }
 `;
 

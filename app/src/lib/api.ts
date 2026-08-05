@@ -53,18 +53,18 @@ import type { Turn, Sector, Queue, Terminal } from "shared";
 // Turn API
 export async function createTurn(
   queueId: string,
-  memberId: string,
+  memberNumber: number,
   channel: "totem" | "whatsapp" | "mobile" = "totem"
 ): Promise<Turn> {
   return callFunction<Turn>("createTurn", "POST", {
     queueId,
-    memberId,
+    memberNumber,
     channel,
   });
 }
 
-export async function getCurrentTurn(memberId: string): Promise<Turn> {
-  return callFunction<Turn>("getCurrentTurn", "GET", undefined, { memberId });
+export async function getCurrentTurn(memberNumber: number): Promise<Turn> {
+  return callFunction<Turn>("getCurrentTurn", "GET", undefined, { memberNumber: String(memberNumber) });
 }
 
 export async function cancelTurn(turnId: string): Promise<void> {
