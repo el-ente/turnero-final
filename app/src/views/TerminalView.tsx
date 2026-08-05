@@ -10,6 +10,7 @@ import {
   finishTurn,
   noShowTurn,
   recallTurn,
+  apiUpdateTerminal,
 } from "../lib/api";
 import { toDate } from "../lib/dates";
 
@@ -34,6 +35,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
   const [waitingTurns, setWaitingTurns] = useState<Turn[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [confirmingNoShow, setConfirmingNoShow] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, "terminals", terminalId), (snap) => {
@@ -78,6 +80,10 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     return unsubscribe;
   }, [terminal?.currentTurnId]);
 
+  useEffect(() => {
+    setConfirmingNoShow(false);
+  }, [currentTurn?.id]);
+
   const showMessage = (type: "success" | "error", text: string) => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 3000);
@@ -106,9 +112,17 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     try {
       await callTurn(terminalId, currentTurn.id);
       showMessage("success", `Turno ${currentTurn.currentTurnNumber} llamado`);
+      setLoading(false);
     } catch (err) {
-      showMessage("error", err instanceof Error ? err.message : "Error");
-    } finally {
+      const message = err instanceof Error ? err.message : "Error";
+      // Another terminal got there first — the suggested turn is stale.
+      // Re-pull instead of leaving the operator at a dead end.
+      if (message.includes("not in WAITING status")) {
+        showMessage("error", "Ese turno ya no estaba disponible, buscando otro...");
+        await handleNextTurn();
+        return;
+      }
+      showMessage("error", message);
       setLoading(false);
     }
   };
@@ -140,8 +154,9 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     }
   };
 
-  const handleNoShow = async () => {
+  const handleConfirmNoShow = async () => {
     if (!currentTurn) return;
+    setConfirmingNoShow(false);
     setLoading(true);
     try {
       await noShowTurn(terminalId, currentTurn.id);
@@ -151,6 +166,17 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
       showMessage("error", err instanceof Error ? err.message : "Error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleTerminalStatus = async () => {
+    if (!terminal) return;
+    const nextStatus = terminal.status === "offline" ? "available" : "offline";
+    try {
+      await apiUpdateTerminal(terminalId, { status: nextStatus });
+      showMessage("success", nextStatus === "offline" ? "Terminal pausada" : "Terminal reanudada");
+    } catch (err) {
+      showMessage("error", err instanceof Error ? err.message : "Error");
     }
   };
 
@@ -172,15 +198,22 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
       {/* Sidebar */}
       <aside className="term-sidebar">
         <div className="term-identity">
-          <div className="term-id-dot"></div>
-          <div>
+          <div className={`term-id-dot ${terminal?.status === "offline" ? "term-id-dot-offline" : ""}`}></div>
+          <div className="term-id-info">
             <div className="term-id-name">{terminal?.name || terminalId}</div>
-            <div className="term-id-status">{terminal?.status === "offline" ? "Desconectado" : "En línea"}</div>
+            <div className="term-id-status">{terminal?.status === "offline" ? "Pausada" : "En línea"}</div>
           </div>
+          <button className="term-pause-btn" onClick={handleToggleTerminalStatus} disabled={!terminal}>
+            {terminal?.status === "offline" ? "Reanudar" : "Pausar"}
+          </button>
         </div>
 
         <div className="term-actions">
-          <button className="term-btn term-btn-primary" onClick={handleNextTurn} disabled={loading || !terminal}>
+          <button
+            className="term-btn term-btn-primary"
+            onClick={handleNextTurn}
+            disabled={loading || !terminal || terminal.status === "offline"}
+          >
             Proximo turno
           </button>
           <button className="term-btn term-btn-default" onClick={handleCallTurn} disabled={loading || !currentTurn}>
@@ -198,9 +231,25 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           <button className="term-btn term-btn-outline" onClick={handleRecallTurn} disabled={loading || !currentTurn}>
             Re-llamar
           </button>
-          <button className="term-btn term-btn-danger" onClick={handleNoShow} disabled={loading || !currentTurn}>
-            No presento
-          </button>
+          {confirmingNoShow ? (
+            <div className="term-noshow-confirm">
+              <span>¿Seguro?</span>
+              <button className="term-btn term-btn-danger" onClick={handleConfirmNoShow} disabled={loading}>
+                Sí, no presentó
+              </button>
+              <button className="term-btn term-btn-outline" onClick={() => setConfirmingNoShow(false)} disabled={loading}>
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              className="term-btn term-btn-danger"
+              onClick={() => setConfirmingNoShow(true)}
+              disabled={loading || !currentTurn}
+            >
+              No presento
+            </button>
+          )}
         </div>
       </aside>
 
@@ -296,6 +345,35 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           50% { opacity: 0.4; }
         }
 
+        .term-id-dot-offline {
+          background: var(--text-light);
+          animation: none;
+        }
+
+        .term-id-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .term-pause-btn {
+          flex-shrink: 0;
+          padding: 0.35rem 0.65rem;
+          background: transparent;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm);
+          color: var(--text-muted);
+          font-family: var(--font-body);
+          font-size: 0.75rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .term-pause-btn:hover:not(:disabled) {
+          border-color: var(--text-light);
+          color: var(--text);
+        }
+
         .term-id-name {
           font-weight: 600;
           font-size: 0.9rem;
@@ -319,6 +397,21 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           height: 1px;
           background: var(--border-light);
           margin: 0.25rem 0;
+        }
+
+        .term-noshow-confirm {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+          padding: 0.6rem;
+          background: var(--danger-light);
+          border-radius: var(--radius-sm);
+        }
+
+        .term-noshow-confirm span {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--danger);
         }
 
         /* Base buttons read as physical counter controls: a bottom "lip"
