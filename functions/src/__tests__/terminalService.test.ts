@@ -114,6 +114,186 @@ describe("Terminal Service", () => {
     });
   });
 
+  describe("getNextTurnRatioBased (via getNextTurn)", () => {
+    function mockTerminalAndQueues(terminal: Terminal, queueDocs: {id: string; type: string}[]) {
+      const whereMock = jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue({
+          docs: queueDocs.map((q) => ({id: q.id, data: () => ({type: q.type})})),
+        }),
+      });
+
+      (db.collection as jest.Mock).mockImplementation((name: string) => {
+        if (name === "terminals") {
+          return {
+            doc: jest.fn().mockReturnValue({
+              get: jest.fn().mockResolvedValue({exists: true, data: () => terminal}),
+            }),
+          };
+        }
+        if (name === "queues") {
+          return {where: whereMock};
+        }
+        return {doc: jest.fn().mockReturnValue({get: jest.fn()})};
+      });
+    }
+
+    function priorityPreferredTerminal(): Terminal {
+      return {
+        id: "terminal-1",
+        name: "Terminal 1",
+        sectorIds: ["sector-1"],
+        activeQueueIds: ["q1", "q2"],
+        servingStrategy: ServingStrategy.RATIO_BASED,
+        strategyConfig: {
+          strategy: ServingStrategy.RATIO_BASED,
+          ratioBased: {normalQueueRatio: 3, priorityQueueRatio: 1, normalCounterState: 0, priorityCounterState: 0},
+        },
+        status: "available",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+
+    function normalPreferredTerminal(): Terminal {
+      return {
+        id: "terminal-1",
+        name: "Terminal 1",
+        sectorIds: ["sector-1"],
+        activeQueueIds: ["q1", "q2"],
+        servingStrategy: ServingStrategy.RATIO_BASED,
+        strategyConfig: {
+          strategy: ServingStrategy.RATIO_BASED,
+          ratioBased: {normalQueueRatio: 3, priorityQueueRatio: 1, normalCounterState: 0, priorityCounterState: 1},
+        },
+        status: "available",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+
+    const queueDocs = [
+      {id: "q1", type: "normal"},
+      {id: "q2", type: "priority"},
+    ];
+
+    it("returns null when strategyConfig.ratioBased is missing", async () => {
+      const mockTerminal: Terminal = {
+        id: "terminal-1",
+        name: "Terminal 1",
+        sectorIds: ["sector-1"],
+        activeQueueIds: ["q1"],
+        servingStrategy: ServingStrategy.RATIO_BASED,
+        strategyConfig: {strategy: ServingStrategy.RATIO_BASED},
+        status: "available",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (db.collection as jest.Mock).mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          get: jest.fn().mockResolvedValue({exists: true, data: () => mockTerminal}),
+        }),
+      });
+
+      const result = await getNextTurn("terminal-1");
+
+      expect(result).toBeNull();
+      expect(getWaitingTurnsAcrossQueues).not.toHaveBeenCalled();
+    });
+
+    it("returns the first priority turn when counters favor priority and priority turns are waiting", async () => {
+      mockTerminalAndQueues(priorityPreferredTerminal(), queueDocs);
+      const priorityTurn: Turn = {
+        id: "turn-p1",
+        memberId: "member-1",
+        queueId: "q2",
+        originalTurnNumber: 1,
+        currentTurnNumber: 1,
+        status: TurnStatus.WAITING,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: new Date(),
+      };
+      (getWaitingTurnsAcrossQueues as jest.Mock).mockResolvedValueOnce([priorityTurn]);
+
+      const result = await getNextTurn("terminal-1");
+
+      expect(result).toEqual(priorityTurn);
+      expect(getWaitingTurnsAcrossQueues).toHaveBeenCalledTimes(1);
+      expect(getWaitingTurnsAcrossQueues).toHaveBeenCalledWith(["q2"]);
+    });
+
+    it("falls back to the first normal turn when counters favor priority but no priority turns are waiting", async () => {
+      mockTerminalAndQueues(priorityPreferredTerminal(), queueDocs);
+      const normalTurn: Turn = {
+        id: "turn-n1",
+        memberId: "member-2",
+        queueId: "q1",
+        originalTurnNumber: 2,
+        currentTurnNumber: 2,
+        status: TurnStatus.WAITING,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: new Date(),
+      };
+      (getWaitingTurnsAcrossQueues as jest.Mock)
+        .mockResolvedValueOnce([]) // priority queues: none waiting
+        .mockResolvedValueOnce([normalTurn]); // fallback to normal queues
+
+      const result = await getNextTurn("terminal-1");
+
+      expect(result).toEqual(normalTurn);
+      expect(getWaitingTurnsAcrossQueues).toHaveBeenNthCalledWith(1, ["q2"]);
+      expect(getWaitingTurnsAcrossQueues).toHaveBeenNthCalledWith(2, ["q1"]);
+    });
+
+    it("returns the first normal turn when counters favor normal and normal turns are waiting", async () => {
+      mockTerminalAndQueues(normalPreferredTerminal(), queueDocs);
+      const normalTurn: Turn = {
+        id: "turn-n1",
+        memberId: "member-1",
+        queueId: "q1",
+        originalTurnNumber: 1,
+        currentTurnNumber: 1,
+        status: TurnStatus.WAITING,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: new Date(),
+      };
+      (getWaitingTurnsAcrossQueues as jest.Mock).mockResolvedValueOnce([normalTurn]);
+
+      const result = await getNextTurn("terminal-1");
+
+      expect(result).toEqual(normalTurn);
+      expect(getWaitingTurnsAcrossQueues).toHaveBeenCalledTimes(1);
+      expect(getWaitingTurnsAcrossQueues).toHaveBeenCalledWith(["q1"]);
+    });
+
+    it("falls back to the first priority turn when counters favor normal but no normal turns are waiting", async () => {
+      mockTerminalAndQueues(normalPreferredTerminal(), queueDocs);
+      const priorityTurn: Turn = {
+        id: "turn-p1",
+        memberId: "member-2",
+        queueId: "q2",
+        originalTurnNumber: 2,
+        currentTurnNumber: 2,
+        status: TurnStatus.WAITING,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: new Date(),
+      };
+      (getWaitingTurnsAcrossQueues as jest.Mock)
+        .mockResolvedValueOnce([]) // normal queues: none waiting
+        .mockResolvedValueOnce([priorityTurn]); // fallback to priority queues
+
+      const result = await getNextTurn("terminal-1");
+
+      expect(result).toEqual(priorityTurn);
+      expect(getWaitingTurnsAcrossQueues).toHaveBeenNthCalledWith(1, ["q1"]);
+      expect(getWaitingTurnsAcrossQueues).toHaveBeenNthCalledWith(2, ["q2"]);
+    });
+  });
+
   describe("nextRatioCounterState", () => {
     it("increments the normal counter for a normal turn", () => {
       const result = nextRatioCounterState(
