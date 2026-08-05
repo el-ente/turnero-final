@@ -58,7 +58,7 @@ async function seed() {
     const queue1: Queue = {
       id: "queue-1",
       sectorId: sector1.id,
-      name: "Clientes VIP",
+      name: "Atención Prioritaria",
       type: QueueType.PRIORITY,
       reenqueueConfig: {
         enabled: true,
