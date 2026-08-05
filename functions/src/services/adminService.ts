@@ -1,6 +1,7 @@
 import {db} from "../config/firebase-admin";
 import {NotFoundError, ConflictError, ValidationError} from "../utils/errors";
 import {FieldValue} from "firebase-admin/firestore";
+import {QueueType, ServingStrategy} from "shared";
 
 // ─── Sectors ───
 
@@ -97,6 +98,9 @@ export async function createQueue(data: {
 }) {
   if (!data.name) throw new ValidationError("name is required");
   if (!data.sectorId) throw new ValidationError("sectorId is required");
+  if (data.type !== undefined && !Object.values(QueueType).includes(data.type as QueueType)) {
+    throw new ValidationError("Invalid queue type");
+  }
 
   // Validate sector exists
   const sectorDoc = await db.collection("sectors").doc(data.sectorId).get();
@@ -127,6 +131,9 @@ export async function updateQueue(queueId: string, data: Record<string, any>) {
   const ref = db.collection("queues").doc(queueId);
   const doc = await ref.get();
   if (!doc.exists) throw new NotFoundError("Queue not found");
+  if (data.type !== undefined && !Object.values(QueueType).includes(data.type as QueueType)) {
+    throw new ValidationError("Invalid queue type");
+  }
 
   const updateData: Record<string, any> = {updatedAt: new Date()};
   if (data.name !== undefined) updateData.name = data.name;
@@ -180,6 +187,12 @@ export async function createTerminal(data: {
   strategyConfig: Record<string, any>;
 }) {
   if (!data.name) throw new ValidationError("name is required");
+  if (
+    data.servingStrategy !== undefined &&
+    !Object.values(ServingStrategy).includes(data.servingStrategy as ServingStrategy)
+  ) {
+    throw new ValidationError("Invalid serving strategy");
+  }
 
   const ref = db.collection("terminals").doc();
   const terminal = {
@@ -211,6 +224,12 @@ export async function updateTerminal(terminalId: string, data: Record<string, an
   const ref = db.collection("terminals").doc(terminalId);
   const doc = await ref.get();
   if (!doc.exists) throw new NotFoundError("Terminal not found");
+  if (
+    data.servingStrategy !== undefined &&
+    !Object.values(ServingStrategy).includes(data.servingStrategy as ServingStrategy)
+  ) {
+    throw new ValidationError("Invalid serving strategy");
+  }
 
   const oldData = doc.data()!;
   const updateData: Record<string, any> = {updatedAt: new Date()};

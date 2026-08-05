@@ -97,10 +97,6 @@ export async function getQueueStats(queueId: string) {
   return callFunction("getQueueStats", "GET", undefined, { queueId });
 }
 
-export async function updateQueueConfig(queueId: string, config: any) {
-  return callFunction("updateQueueConfig", "PUT", config, { queueId });
-}
-
 // CRUD — Sectors
 export async function apiCreateSector(data: { name: string; description?: string }) {
   return callFunction<Sector>("createSector", "POST", data);

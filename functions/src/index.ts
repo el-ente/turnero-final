@@ -9,7 +9,7 @@ import {
   noShowHandler,
 } from "./controllers/terminalController";
 import {
-  getQueueStatsHandler, updateQueueConfigHandler,
+  getQueueStatsHandler,
   createSectorHandler, listSectorsHandler, updateSectorHandler, deleteSectorHandler,
   createQueueHandler, listQueuesHandler, updateQueueHandler, deleteQueueHandler,
   createTerminalHandler, listTerminalsHandler, updateTerminalHandler, deleteTerminalHandler,
@@ -31,7 +31,6 @@ export const noShow = noShowHandler;
 
 // Admin endpoints
 export const getQueueStats = getQueueStatsHandler;
-export const updateQueueConfig = updateQueueConfigHandler;
 
 // CRUD — Sectors
 export const createSector = createSectorHandler;
