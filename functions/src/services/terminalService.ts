@@ -1,8 +1,19 @@
-import {Turn, TurnStatus, Terminal, ServingStrategy, Queue} from "shared";
+import {Turn, TurnStatus, Terminal, ServingStrategy, Queue, RatioBasedConfig} from "shared";
+import {FieldPath} from "firebase-admin/firestore";
 import {db} from "../config/firebase-admin";
 import {NotFoundError, ConflictError} from "../utils/errors";
 import {getWaitingTurnsAcrossQueues} from "./queueService";
 import {updateTurnStatus} from "./turnService";
+
+export function nextRatioCounterState(config: RatioBasedConfig, isPriority: boolean) {
+  let normal = config.normalCounterState || 0;
+  let priority = config.priorityCounterState || 0;
+  if (isPriority) priority += 1; else normal += 1;
+  if (normal >= config.normalQueueRatio && priority >= config.priorityQueueRatio) {
+    normal = 0; priority = 0;
+  }
+  return {normalCounterState: normal, priorityCounterState: priority};
+}
 
 export async function getNextTurn(terminalId: string): Promise<Turn | null> {
   const terminalDoc = await db.collection("terminals").doc(terminalId).get();
@@ -52,10 +63,16 @@ async function getNextTurnRatioBased(terminal: Terminal): Promise<Turn | null> {
   const normalQueues: string[] = [];
   const priorityQueues: string[] = [];
 
+  const queueTypeById = new Map<string, string>();
+  if (terminal.activeQueueIds.length > 0) {
+    const snap = await db.collection("queues")
+      .where(FieldPath.documentId(), "in", terminal.activeQueueIds)
+      .get();
+    snap.docs.forEach((d) => queueTypeById.set(d.id, (d.data() as any).type));
+  }
+
   for (const queueId of terminal.activeQueueIds) {
-    const queueDoc = await db.collection("queues").doc(queueId).get();
-    const queue = queueDoc.data() as any;
-    if (queue.type === "priority") {
+    if (queueTypeById.get(queueId) === "priority") {
       priorityQueues.push(queueId);
     } else {
       normalQueues.push(queueId);
@@ -107,15 +124,29 @@ export async function callTurn(terminalId: string, turnId: string): Promise<void
       throw new ConflictError(`Turn is not in WAITING status (current: ${turn.status})`);
     }
 
+    const queueRef = db.collection("queues").doc(turn.queueId);
+    const queueDoc = await transaction.get(queueRef);
+
     transaction.update(turnRef, {
       status: TurnStatus.CALLED,
       calledAt: new Date(),
       terminalId,
     });
 
-    transaction.update(terminalRef, {
-      currentTurnId: turnId,
-    });
+    const terminal = terminalDoc.data() as Terminal;
+    const terminalUpdate: Record<string, unknown> = {currentTurnId: turnId};
+
+    if (terminal.servingStrategy === ServingStrategy.RATIO_BASED && terminal.strategyConfig.ratioBased) {
+      const queue = queueDoc.data() as Queue;
+      const isPriority = queue.type === "priority";
+      const nextConfig = nextRatioCounterState(terminal.strategyConfig.ratioBased, isPriority);
+      terminalUpdate.strategyConfig = {
+        ...terminal.strategyConfig,
+        ratioBased: {...terminal.strategyConfig.ratioBased, ...nextConfig},
+      };
+    }
+
+    transaction.update(terminalRef, terminalUpdate);
   });
 }
 
@@ -155,27 +186,9 @@ export async function finishTurn(terminalId: string, turnId: string): Promise<vo
       finishedAt: new Date(),
     });
 
-    // Update terminal counters if ratio_based strategy
-    const terminal = (await transaction.get(db.collection("terminals").doc(terminalId))).data() as Terminal;
-    if (terminal.servingStrategy === ServingStrategy.RATIO_BASED && terminal.strategyConfig.ratioBased) {
-      const queue = (await transaction.get(db.collection("queues").doc(turn.queueId))).data() as any;
-      const config = {...terminal.strategyConfig.ratioBased};
-
-      if (queue.type === "priority") {
-        config.priorityCounterState = (config.priorityCounterState || 0) + 1;
-      } else {
-        config.normalCounterState = (config.normalCounterState || 0) + 1;
-      }
-
-      transaction.update(db.collection("terminals").doc(terminalId), {
-        strategyConfig: {...terminal.strategyConfig, ratioBased: config},
-        currentTurnId: "",
-      });
-    } else {
-      transaction.update(db.collection("terminals").doc(terminalId), {
-        currentTurnId: "",
-      });
-    }
+    transaction.update(db.collection("terminals").doc(terminalId), {
+      currentTurnId: "",
+    });
   });
 }
 
