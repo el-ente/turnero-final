@@ -32,28 +32,30 @@ export async function createTurn(
 
   let turnId = "";
   let turnNumber = 0;
+  let createdAt = new Date();
 
   // Use transaction to get next number and create turn atomically
   await db.runTransaction(async (transaction) => {
     const today = getTodayMidnightInArgentina();
 
-    // Find the highest turn number for this queue today
+    // Find the highest turn number for this queue today across ALL of today's turns,
+    // not just the most recently created one (requeues bump currentTurnNumber without
+    // changing createdAt, so the most-recent doc isn't necessarily the highest).
     const turnsSnap = await transaction.get(
       db
         .collection("turns")
         .where("queueId", "==", queueId)
         .where("createdAt", ">=", today)
-        .orderBy("createdAt", "desc")
-        .limit(1)
     );
 
     let maxNumber = 0;
-    if (!turnsSnap.empty) {
-      const lastTurn = turnsSnap.docs[0].data() as Turn;
-      maxNumber = Math.max(lastTurn.originalTurnNumber, lastTurn.currentTurnNumber);
-    }
+    turnsSnap.docs.forEach((doc) => {
+      const t = doc.data() as Turn;
+      maxNumber = Math.max(maxNumber, t.originalTurnNumber, t.currentTurnNumber);
+    });
 
     turnNumber = maxNumber + 1;
+    createdAt = new Date();
 
     // Create new turn
     const newTurn: Turn = {
@@ -65,7 +67,7 @@ export async function createTurn(
       status: TurnStatus.WAITING,
       channel,
       recallCount: 0,
-      createdAt: new Date(),
+      createdAt,
     };
 
     const turnRef = db.collection("turns").doc();
@@ -84,7 +86,7 @@ export async function createTurn(
     status: TurnStatus.WAITING,
     channel,
     recallCount: 0,
-    createdAt: getTodayMidnightInArgentina(),
+    createdAt,
   };
 }
 
