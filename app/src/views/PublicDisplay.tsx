@@ -1,11 +1,36 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Turn } from "shared";
 import { db } from "../lib/firebase";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { toDate } from "../lib/dates";
 
+/** Short two-tone chime so a called number doesn't rely purely on the screen being watched. */
+function playChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+    [880, 1108.73].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now + i * 0.18);
+      gain.gain.linearRampToValueAtTime(0.15, now + i * 0.18 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.18);
+      osc.stop(now + i * 0.18 + 0.4);
+    });
+  } catch {
+    // Audio unavailable or blocked — display still works visually
+  }
+}
+
 export function PublicDisplay() {
   const [calledTurns, setCalledTurns] = useState<Turn[]>([]);
+  const [terminalNames, setTerminalNames] = useState<Record<string, string>>({});
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -30,12 +55,32 @@ export function PublicDisplay() {
   }, []);
 
   useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "terminals"), (snapshot) => {
+      const names: Record<string, string> = {};
+      snapshot.docs.forEach((d) => {
+        names[d.id] = (d.data() as { name: string }).name;
+      });
+      setTerminalNames(names);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
   const currentTurn = calledTurns[0];
   const nextTurns = calledTurns.slice(1, 6);
+
+  // Chime only on a genuine new call, not on first load of an already-called turn.
+  const prevTurnIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (currentTurn?.id && prevTurnIdRef.current !== undefined && currentTurn.id !== prevTurnIdRef.current) {
+      playChime();
+    }
+    prevTurnIdRef.current = currentTurn?.id;
+  }, [currentTurn?.id]);
 
   return (
     <div className="display">
@@ -57,7 +102,7 @@ export function PublicDisplay() {
               <div className="now-number">{currentTurn.currentTurnNumber}</div>
               <div className="now-terminal">
                 <span className="terminal-icon">◉</span>
-                {currentTurn.terminalId || "—"}
+                {(currentTurn.terminalId && terminalNames[currentTurn.terminalId]) || currentTurn.terminalId || "—"}
               </div>
             </div>
           ) : (
@@ -75,7 +120,7 @@ export function PublicDisplay() {
               {nextTurns.map((turn, idx) => (
                 <div key={turn.id} className="sidebar-item" style={{ animationDelay: `${idx * 0.08}s` }}>
                   <span className="sidebar-number">{turn.currentTurnNumber}</span>
-                  <span className="sidebar-terminal">{turn.terminalId || "—"}</span>
+                  <span className="sidebar-terminal">{(turn.terminalId && terminalNames[turn.terminalId]) || turn.terminalId || "—"}</span>
                 </div>
               ))}
             </div>
