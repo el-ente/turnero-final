@@ -24,5 +24,6 @@ export interface Turn {
   attendingAt?: Date;
   finishedAt?: Date;
   lastRequeueAt?: Date;
+  lastRecallAt?: Date;
   terminalId?: string;
 }

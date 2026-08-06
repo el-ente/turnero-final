@@ -88,15 +88,18 @@ export function PublicDisplay() {
 
   // Chime per terminal — each counter's own new call rings independently,
   // instead of one global ref racing across whichever counter called last.
-  const prevTurnIdByTerminal = useRef<Record<string, string | undefined>>({});
+  // Signature combines turn id + lastRecallAt so a re-llamar on the SAME
+  // turn (id unchanged) still rings again, not just a brand-new call.
+  const prevSignatureByTerminal = useRef<Record<string, string | undefined>>({});
   useEffect(() => {
     for (const terminal of activeTerminals) {
       const turn = latestTurnByTerminal[terminal.id];
-      const prev = prevTurnIdByTerminal.current[terminal.id];
-      if (turn?.id && prev !== undefined && turn.id !== prev) {
+      const signature = turn ? `${turn.id}:${turn.lastRecallAt ? toDate(turn.lastRecallAt).getTime() : 0}` : undefined;
+      const prev = prevSignatureByTerminal.current[terminal.id];
+      if (signature && prev !== undefined && signature !== prev) {
         playChime();
       }
-      prevTurnIdByTerminal.current[terminal.id] = turn?.id;
+      prevSignatureByTerminal.current[terminal.id] = signature;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calledTurns, terminals]);

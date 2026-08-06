@@ -204,9 +204,12 @@ export async function recallTurn(terminalId: string, turnId: string): Promise<vo
     throw new ConflictError(`Turn is not in CALLED status (current: ${turn.status})`);
   }
 
-  // Re-call the turn (set status back to called)
+  // Re-call: bump the count and stamp when, so the Display can tell this
+  // apart from the original call and chime again — same turn id, so
+  // nothing else about it changes.
   await db.collection("turns").doc(turnId).update({
     recallCount: turn.recallCount + 1,
+    lastRecallAt: new Date(),
   });
 }
 

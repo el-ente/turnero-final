@@ -1,4 +1,4 @@
-import {getNextTurn, callTurn, startTurn, finishTurn, handleNoShow, nextRatioCounterState} from "../services/terminalService";
+import {getNextTurn, callTurn, startTurn, finishTurn, recallTurn, handleNoShow, nextRatioCounterState} from "../services/terminalService";
 import {db} from "../config/firebase-admin";
 import {Terminal, Turn, TurnStatus, ServingStrategy} from "shared";
 import {NotFoundError, ConflictError} from "../utils/errors";
@@ -536,6 +536,67 @@ describe("Terminal Service", () => {
       });
 
       expect(startTurn("terminal-1", "turn-1")).rejects.toThrow();
+    });
+  });
+
+  describe("recallTurn", () => {
+    it("bumps recallCount and stamps lastRecallAt for a CALLED turn", async () => {
+      const mockTurn: Turn = {
+        id: "turn-1",
+        memberNumber: 1,
+        queueId: "queue-1",
+        queuedAt: new Date(),
+        status: TurnStatus.CALLED,
+        channel: "totem",
+        recallCount: 1,
+        createdAt: new Date(),
+      };
+      const updateSpy = jest.fn().mockResolvedValue(undefined);
+
+      (db.collection as jest.Mock).mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          get: jest.fn().mockResolvedValue({exists: true, data: () => mockTurn}),
+          update: updateSpy,
+        }),
+      });
+
+      await recallTurn("terminal-1", "turn-1");
+
+      expect(updateSpy).toHaveBeenCalledTimes(1);
+      const updateArg = updateSpy.mock.calls[0][0];
+      expect(updateArg.recallCount).toBe(2);
+      expect(updateArg.lastRecallAt).toBeInstanceOf(Date);
+    });
+
+    it("throws ConflictError if turn is not in CALLED status", async () => {
+      const mockTurn: Turn = {
+        id: "turn-1",
+        memberNumber: 1,
+        queueId: "queue-1",
+        queuedAt: new Date(),
+        status: TurnStatus.WAITING,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: new Date(),
+      };
+
+      (db.collection as jest.Mock).mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          get: jest.fn().mockResolvedValue({exists: true, data: () => mockTurn}),
+        }),
+      });
+
+      await expect(recallTurn("terminal-1", "turn-1")).rejects.toThrow();
+    });
+
+    it("throws NotFoundError if turn does not exist", async () => {
+      (db.collection as jest.Mock).mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          get: jest.fn().mockResolvedValue({exists: false}),
+        }),
+      });
+
+      await expect(recallTurn("terminal-1", "invalid-turn")).rejects.toThrow();
     });
   });
 
