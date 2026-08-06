@@ -90,6 +90,20 @@ export function PublicDisplay() {
   // instead of one global ref racing across whichever counter called last.
   // Signature combines turn id + lastRecallAt so a re-llamar on the SAME
   // turn (id unchanged) still rings again, not just a brand-new call.
+  //
+  // The chime alone doesn't say WHICH card — with several counters open at
+  // once, that's ambiguous, and a recall has no other visible tell (same
+  // card, same number, nothing changes) unlike a new call (idle → number,
+  // or number changing). So a recall also flashes its own card for a few
+  // seconds, tracked per terminal since two counters can recall close
+  // together and shouldn't cancel each other's flash.
+  const [flashingTerminals, setFlashingTerminals] = useState<Record<string, boolean>>({});
+  const flashTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  useEffect(() => () => {
+    Object.values(flashTimeoutsRef.current).forEach(clearTimeout);
+  }, []);
+
   const prevSignatureByTerminal = useRef<Record<string, string | undefined>>({});
   useEffect(() => {
     for (const terminal of activeTerminals) {
@@ -98,6 +112,19 @@ export function PublicDisplay() {
       const prev = prevSignatureByTerminal.current[terminal.id];
       if (signature && prev !== undefined && signature !== prev) {
         playChime();
+
+        const isRecall = turn && prev.startsWith(`${turn.id}:`);
+        if (isRecall) {
+          setFlashingTerminals((current) => ({ ...current, [terminal.id]: true }));
+          if (flashTimeoutsRef.current[terminal.id]) clearTimeout(flashTimeoutsRef.current[terminal.id]);
+          flashTimeoutsRef.current[terminal.id] = setTimeout(() => {
+            setFlashingTerminals((current) => {
+              const next = { ...current };
+              delete next[terminal.id];
+              return next;
+            });
+          }, 3000);
+        }
       }
       prevSignatureByTerminal.current[terminal.id] = signature;
     }
@@ -127,8 +154,12 @@ export function PublicDisplay() {
             {activeTerminals.map((terminal) => {
               const turn = latestTurnByTerminal[terminal.id];
               const label = sectorLabel(terminal);
+              const isFlashing = flashingTerminals[terminal.id];
               return (
-                <div key={terminal.id} className={`counter-card tear-edge ${turn ? "" : "counter-idle"}`}>
+                <div
+                  key={terminal.id}
+                  className={`counter-card tear-edge ${turn ? "" : "counter-idle"} ${isFlashing ? "counter-recalling" : ""}`}
+                >
                   <div className="counter-header">
                     <span className="counter-name">{terminal.name}</span>
                     {label && <span className="counter-sector">{label}</span>}
@@ -141,6 +172,9 @@ export function PublicDisplay() {
                   <span className="counter-status">
                     {turn ? "Ahora atendiendo" : "Esperando"}
                   </span>
+                  {turn && turn.recallCount > 0 && (
+                    <span className="counter-recall-badge">Rellamado {turn.recallCount}x</span>
+                  )}
                 </div>
               );
             })}
@@ -291,6 +325,26 @@ export function PublicDisplay() {
 
         .counter-idle .counter-status {
           color: rgba(250,247,242,0.2);
+        }
+
+        .counter-recall-badge {
+          display: inline-block;
+          margin-top: 0.6rem;
+          font-size: 0.7rem;
+          font-weight: 700;
+          color: #E9A84C;
+          background: rgba(233,168,76,0.15);
+          padding: 0.2rem 0.65rem;
+          border-radius: 999px;
+        }
+
+        .counter-recalling {
+          animation: recall-pulse 0.6s ease-in-out 5;
+        }
+
+        @keyframes recall-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(233,168,76,0); border-color: rgba(212,96,58,0.4); }
+          50% { box-shadow: 0 0 0 10px rgba(233,168,76,0.3); border-color: #E9A84C; }
         }
 
         .display-footer {
