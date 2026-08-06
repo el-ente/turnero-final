@@ -86,37 +86,41 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     setTimeout(() => setMessage(null), 3000);
   };
 
-  const handleNextTurn = async () => {
+  // Pulls the next candidate per the terminal's dispatch strategy and calls
+  // them in one motion — no separate "load, then announce" step. The window
+  // where the picked candidate could go stale (another session calls it
+  // first) shrinks to a single round-trip instead of however long an
+  // operator pauses between two clicks; on that rare conflict, just pull
+  // and call again instead of surfacing an error.
+  const handleCallNext = async () => {
     setLoading(true);
+    let turn: Turn | null;
     try {
-      const turn = await getNextTurn(terminalId);
-      if (turn) {
-        setCurrentTurn(turn);
-        showMessage("success", `Turno ${turn.memberNumber} seleccionado`);
-      } else {
-        showMessage("error", "No hay turnos disponibles");
-      }
+      // The backend 404s (not a null/200 response) when nothing's waiting,
+      // so that case arrives here as a thrown error, not a falsy return —
+      // translate its raw message instead of letting it leak through.
+      turn = await getNextTurn(terminalId);
     } catch (err) {
-      showMessage("error", err instanceof Error ? err.message : "Error");
-    } finally {
+      const message = err instanceof Error ? err.message : "Error";
+      showMessage("error", message.includes("No waiting turns") ? "No hay turnos disponibles" : message);
       setLoading(false);
+      return;
     }
-  };
-
-  const handleCallTurn = async () => {
-    if (!currentTurn) return;
-    setLoading(true);
+    if (!turn) {
+      showMessage("error", "No hay turnos disponibles");
+      setLoading(false);
+      return;
+    }
+    setCurrentTurn(turn); // optimistic — the terminal's currentTurnId listener confirms shortly after
     try {
-      await callTurn(terminalId, currentTurn.id);
-      showMessage("success", `Turno ${currentTurn.memberNumber} llamado`);
+      await callTurn(terminalId, turn.id);
+      showMessage("success", `Turno ${turn.memberNumber} llamado`);
       setLoading(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error";
-      // Another terminal got there first — the suggested turn is stale.
-      // Re-pull instead of leaving the operator at a dead end.
       if (message.includes("not in WAITING status")) {
         showMessage("error", "Ese turno ya no estaba disponible, buscando otro...");
-        await handleNextTurn();
+        await handleCallNext();
         return;
       }
       showMessage("error", message);
@@ -208,13 +212,10 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
         <div className="term-actions">
           <button
             className="term-btn term-btn-primary"
-            onClick={handleNextTurn}
+            onClick={handleCallNext}
             disabled={loading || !terminal || terminal.status === "offline"}
           >
-            Proximo turno
-          </button>
-          <button className="term-btn term-btn-default" onClick={handleCallTurn} disabled={loading || currentTurn?.status !== "waiting"}>
-            Llamar
+            Llamar siguiente
           </button>
           <button className="term-btn term-btn-default" onClick={handleStartTurn} disabled={loading || currentTurn?.status !== "called"}>
             Iniciar atencion
