@@ -33,88 +33,131 @@ async function seed() {
       console.log(`Cleared ${col}`);
     }
 
-    // 1. Create Sectors
-    const sector1: Sector = {
-      id: "sector-1",
-      name: "Atención General",
-      description: "Módulo de atención general",
+    // 1. Create Sectors — three departments, each with its own regular +
+    // priority queue and a dedicated terminal.
+    const sectorFarmacia: Sector = {
+      id: "sector-farmacia",
+      name: "Farmacia",
+      description: "Dispensa de medicamentos y consultas farmacéuticas",
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    const sector2: Sector = {
-      id: "sector-2",
+    const sectorPerfumeria: Sector = {
+      id: "sector-perfumeria",
       name: "Perfumería",
-      description: "Sección perfumería",
+      description: "Perfumes, cosmética y cuidado personal",
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    await db.collection("sectors").doc(sector1.id).set(sector1);
-    await db.collection("sectors").doc(sector2.id).set(sector2);
-    console.log("Created 2 sectors");
+    const sectorPami: Sector = {
+      id: "sector-pami",
+      name: "PAMI",
+      description: "Atención de recetas y trámites PAMI",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
-    // 2. Create Queues
-    const queue1: Queue = {
-      id: "queue-1",
-      sectorId: sector1.id,
-      name: "Atención Prioritaria",
+    const sectors = [sectorFarmacia, sectorPerfumeria, sectorPami];
+    for (const sector of sectors) {
+      await db.collection("sectors").doc(sector.id).set(sector);
+    }
+    console.log(`Created ${sectors.length} sectors`);
+
+    // 2. Create Queues — regular + priority per sector
+    const queueFarmacia: Queue = {
+      id: "queue-farmacia",
+      sectorId: sectorFarmacia.id,
+      name: "Farmacia",
+      type: QueueType.NORMAL,
+      reenqueueConfig: {enabled: true, maxAttempts: 2, positionsBack: 3},
+      servedBy: ["terminal-farmacia"],
+      active: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const queueFarmaciaPrioritaria: Queue = {
+      id: "queue-farmacia-prioritaria",
+      sectorId: sectorFarmacia.id,
+      name: "Farmacia Prioritaria",
       type: QueueType.PRIORITY,
-      reenqueueConfig: {
-        enabled: true,
-        maxAttempts: 3,
-        positionsBack: 5,
-      },
+      reenqueueConfig: {enabled: true, maxAttempts: 3, positionsBack: 3},
       priorityWeight: 2,
-      servedBy: ["terminal-1", "terminal-2"],
+      servedBy: ["terminal-farmacia"],
       active: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    const queue2: Queue = {
-      id: "queue-2",
-      sectorId: sector1.id,
-      name: "Clientes Regulares",
-      type: QueueType.NORMAL,
-      reenqueueConfig: {
-        enabled: true,
-        maxAttempts: 2,
-        positionsBack: 3,
-      },
-      servedBy: ["terminal-1"],
-      active: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const queue3: Queue = {
-      id: "queue-3",
-      sectorId: sector2.id,
+    const queuePerfumeria: Queue = {
+      id: "queue-perfumeria",
+      sectorId: sectorPerfumeria.id,
       name: "Perfumería",
       type: QueueType.NORMAL,
-      reenqueueConfig: {
-        enabled: false,
-        maxAttempts: 0,
-        positionsBack: 0,
-      },
-      servedBy: ["terminal-2"],
+      reenqueueConfig: {enabled: true, maxAttempts: 2, positionsBack: 3},
+      servedBy: ["terminal-perfumeria"],
       active: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    await db.collection("queues").doc(queue1.id).set(queue1);
-    await db.collection("queues").doc(queue2.id).set(queue2);
-    await db.collection("queues").doc(queue3.id).set(queue3);
-    console.log("Created 3 queues");
+    const queuePerfumeriaPrioritaria: Queue = {
+      id: "queue-perfumeria-prioritaria",
+      sectorId: sectorPerfumeria.id,
+      name: "Perfumería Prioritaria",
+      type: QueueType.PRIORITY,
+      reenqueueConfig: {enabled: true, maxAttempts: 3, positionsBack: 3},
+      priorityWeight: 2,
+      servedBy: ["terminal-perfumeria"],
+      active: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
-    // 3. Create Terminals
-    const terminal1: Terminal = {
-      id: "terminal-1",
-      name: "Módulo 1",
-      sectorIds: [sector1.id],
-      activeQueueIds: [queue1.id, queue2.id],
+    const queuePami: Queue = {
+      id: "queue-pami",
+      sectorId: sectorPami.id,
+      name: "PAMI",
+      type: QueueType.NORMAL,
+      reenqueueConfig: {enabled: true, maxAttempts: 2, positionsBack: 3},
+      servedBy: ["terminal-pami"],
+      active: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const queuePamiPrioritaria: Queue = {
+      id: "queue-pami-prioritaria",
+      sectorId: sectorPami.id,
+      name: "PAMI Prioritaria",
+      type: QueueType.PRIORITY,
+      reenqueueConfig: {enabled: true, maxAttempts: 3, positionsBack: 3},
+      priorityWeight: 2,
+      servedBy: ["terminal-pami"],
+      active: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const queues = [
+      queueFarmacia, queueFarmaciaPrioritaria,
+      queuePerfumeria, queuePerfumeriaPrioritaria,
+      queuePami, queuePamiPrioritaria,
+    ];
+    for (const queue of queues) {
+      await db.collection("queues").doc(queue.id).set(queue);
+    }
+    console.log(`Created ${queues.length} queues`);
+
+    // 3. Create Terminals — one per sector, ratio-based between its own
+    // regular and priority queue.
+    const terminalFarmacia: Terminal = {
+      id: "terminal-farmacia",
+      name: "Farmacia",
+      sectorIds: [sectorFarmacia.id],
+      activeQueueIds: [queueFarmacia.id, queueFarmaciaPrioritaria.id],
       servingStrategy: ServingStrategy.RATIO_BASED,
       strategyConfig: {
         strategy: ServingStrategy.RATIO_BASED,
@@ -130,116 +173,151 @@ async function seed() {
       updatedAt: new Date(),
     };
 
-    const terminal2: Terminal = {
-      id: "terminal-2",
-      name: "Módulo 2",
-      sectorIds: [sector1.id, sector2.id],
-      activeQueueIds: [queue1.id, queue3.id],
-      servingStrategy: ServingStrategy.FIFO_ACROSS_QUEUES,
+    const terminalPerfumeria: Terminal = {
+      id: "terminal-perfumeria",
+      name: "Perfumería",
+      sectorIds: [sectorPerfumeria.id],
+      activeQueueIds: [queuePerfumeria.id, queuePerfumeriaPrioritaria.id],
+      servingStrategy: ServingStrategy.RATIO_BASED,
       strategyConfig: {
-        strategy: ServingStrategy.FIFO_ACROSS_QUEUES,
+        strategy: ServingStrategy.RATIO_BASED,
+        ratioBased: {
+          normalQueueRatio: 2,
+          priorityQueueRatio: 1,
+          normalCounterState: 0,
+          priorityCounterState: 0,
+        },
       },
       status: TerminalStatus.AVAILABLE,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    await db.collection("terminals").doc(terminal1.id).set(terminal1);
-    await db.collection("terminals").doc(terminal2.id).set(terminal2);
-    console.log("Created 2 terminals");
+    const terminalPami: Terminal = {
+      id: "terminal-pami",
+      name: "PAMI",
+      sectorIds: [sectorPami.id],
+      activeQueueIds: [queuePami.id, queuePamiPrioritaria.id],
+      servingStrategy: ServingStrategy.RATIO_BASED,
+      strategyConfig: {
+        strategy: ServingStrategy.RATIO_BASED,
+        ratioBased: {
+          normalQueueRatio: 2,
+          priorityQueueRatio: 1,
+          normalCounterState: 0,
+          priorityCounterState: 0,
+        },
+      },
+      status: TerminalStatus.AVAILABLE,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
-    // 4. Create Turns
+    const terminals = [terminalFarmacia, terminalPerfumeria, terminalPami];
+    for (const terminal of terminals) {
+      await db.collection("terminals").doc(terminal.id).set(terminal);
+    }
+    console.log(`Created ${terminals.length} terminals`);
+
+    // 4. Create sample Turns — a mix of waiting/called/attending across all
+    // three sectors, so every screen has something real to show.
     const now = new Date();
     const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const minutesAgo = (m: number) => new Date(now.getTime() - m * 60000);
 
-    const turn1: Turn = {
-      id: "turn-1",
-      memberNumber: 4213,
-      queueId: queue1.id,
-      queuedAt: todayMidnight,
-      status: TurnStatus.WAITING,
-      channel: "totem",
-      recallCount: 0,
-      createdAt: todayMidnight,
-    };
+    const turns: Turn[] = [
+      {
+        id: "turn-1",
+        memberNumber: 41287,
+        queueId: queueFarmacia.id,
+        queuedAt: todayMidnight,
+        status: TurnStatus.WAITING,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: todayMidnight,
+      },
+      {
+        id: "turn-2",
+        memberNumber: 9034,
+        queueId: queueFarmacia.id,
+        queuedAt: minutesAgo(8),
+        status: TurnStatus.WAITING,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: minutesAgo(8),
+      },
+      {
+        id: "turn-3",
+        memberNumber: 77650,
+        queueId: queueFarmaciaPrioritaria.id,
+        queuedAt: minutesAgo(5),
+        status: TurnStatus.WAITING,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: minutesAgo(5),
+      },
+      {
+        id: "turn-4",
+        memberNumber: 2216,
+        queueId: queuePerfumeria.id,
+        queuedAt: minutesAgo(2),
+        status: TurnStatus.CALLED,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: minutesAgo(2),
+        calledAt: minutesAgo(1),
+        terminalId: terminalPerfumeria.id,
+      },
+      {
+        id: "turn-5",
+        memberNumber: 63801,
+        queueId: queuePerfumeriaPrioritaria.id,
+        queuedAt: minutesAgo(3),
+        status: TurnStatus.WAITING,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: minutesAgo(3),
+      },
+      {
+        id: "turn-6",
+        memberNumber: 512,
+        queueId: queuePami.id,
+        queuedAt: minutesAgo(6),
+        status: TurnStatus.ATTENDING,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: minutesAgo(6),
+        calledAt: minutesAgo(4),
+        attendingAt: minutesAgo(2),
+        terminalId: terminalPami.id,
+      },
+      {
+        id: "turn-7",
+        memberNumber: 98123,
+        queueId: queuePamiPrioritaria.id,
+        queuedAt: minutesAgo(1),
+        status: TurnStatus.WAITING,
+        channel: "totem",
+        recallCount: 1,
+        createdAt: minutesAgo(9),
+        lastRequeueAt: minutesAgo(1),
+      },
+      {
+        id: "turn-8",
+        memberNumber: 35590,
+        queueId: queuePami.id,
+        queuedAt: minutesAgo(15),
+        status: TurnStatus.FINISHED,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: minutesAgo(15),
+        calledAt: minutesAgo(12),
+        attendingAt: minutesAgo(10),
+        finishedAt: minutesAgo(4),
+        terminalId: terminalPami.id,
+      },
+    ];
 
-    const turn2: Turn = {
-      id: "turn-2",
-      memberNumber: 8807,
-      queueId: queue2.id,
-      queuedAt: todayMidnight,
-      status: TurnStatus.WAITING,
-      channel: "totem",
-      recallCount: 0,
-      createdAt: todayMidnight,
-    };
-
-    const turn3: Turn = {
-      id: "turn-3",
-      memberNumber: 15029,
-      queueId: queue1.id,
-      queuedAt: todayMidnight,
-      status: TurnStatus.CALLED,
-      channel: "totem",
-      recallCount: 0,
-      createdAt: todayMidnight,
-      calledAt: new Date(now.getTime() - 60000), // 1 min ago
-      terminalId: terminal1.id,
-    };
-
-    const turn4: Turn = {
-      id: "turn-4",
-      memberNumber: 372,
-      queueId: queue2.id,
-      queuedAt: todayMidnight,
-      status: TurnStatus.ATTENDING,
-      channel: "totem",
-      recallCount: 0,
-      createdAt: todayMidnight,
-      calledAt: new Date(now.getTime() - 120000), // 2 min ago
-      attendingAt: new Date(now.getTime() - 30000), // 30 sec ago
-      terminalId: terminal1.id,
-    };
-
-    const turn5: Turn = {
-      id: "turn-5",
-      memberNumber: 91,
-      queueId: queue3.id,
-      queuedAt: todayMidnight,
-      status: TurnStatus.WAITING,
-      channel: "totem",
-      recallCount: 0,
-      createdAt: todayMidnight,
-    };
-
-    const turn6: Turn = {
-      id: "turn-6",
-      memberNumber: 56234,
-      queueId: queue1.id,
-      queuedAt: todayMidnight,
-      status: TurnStatus.FINISHED,
-      channel: "totem",
-      recallCount: 0,
-      createdAt: todayMidnight,
-      calledAt: new Date(now.getTime() - 300000), // 5 min ago
-      attendingAt: new Date(now.getTime() - 240000), // 4 min ago
-      finishedAt: new Date(now.getTime() - 60000), // 1 min ago
-      terminalId: terminal2.id,
-    };
-
-    const turn7: Turn = {
-      id: "turn-7",
-      memberNumber: 2658,
-      queueId: queue2.id,
-      queuedAt: new Date(now.getTime() - 180000), // requeued: advanced past createdAt
-      status: TurnStatus.WAITING,
-      channel: "totem",
-      recallCount: 1,
-      createdAt: todayMidnight,
-      lastRequeueAt: new Date(now.getTime() - 180000), // 3 min ago
-    };
-
-    const turns = [turn1, turn2, turn3, turn4, turn5, turn6, turn7];
     for (const turn of turns) {
       await db.collection("turns").doc(turn.id).set(turn);
     }

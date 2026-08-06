@@ -96,7 +96,7 @@ Acceso:
 pnpm -F functions seed:emulator
 ```
 
-Crea datos de prueba: 2 sectores, 3 colas, 2 terminales, 7 turnos.
+Crea datos de prueba: 3 sectores (Farmacia, Perfumería, PAMI), 6 colas (regular + prioritaria por sector), 3 terminales (uno por sector, ratio-based), 8 turnos.
 
 ## 🎨 Vistas Frontend
 
