@@ -213,19 +213,19 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           >
             Proximo turno
           </button>
-          <button className="term-btn term-btn-default" onClick={handleCallTurn} disabled={loading || !currentTurn}>
+          <button className="term-btn term-btn-default" onClick={handleCallTurn} disabled={loading || currentTurn?.status !== "waiting"}>
             Llamar
           </button>
-          <button className="term-btn term-btn-default" onClick={handleStartTurn} disabled={loading || !currentTurn}>
+          <button className="term-btn term-btn-default" onClick={handleStartTurn} disabled={loading || currentTurn?.status !== "called"}>
             Iniciar atencion
           </button>
-          <button className="term-btn term-btn-success" onClick={handleFinishTurn} disabled={loading || !currentTurn}>
+          <button className="term-btn term-btn-success" onClick={handleFinishTurn} disabled={loading || currentTurn?.status !== "attending"}>
             Finalizar
           </button>
 
           <div className="term-actions-divider"></div>
 
-          <button className="term-btn term-btn-outline" onClick={handleRecallTurn} disabled={loading || !currentTurn}>
+          <button className="term-btn term-btn-outline" onClick={handleRecallTurn} disabled={loading || currentTurn?.status !== "called"}>
             Re-llamar
           </button>
           {confirmingNoShow ? (
@@ -242,7 +242,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
             <button
               className="term-btn term-btn-danger"
               onClick={() => setConfirmingNoShow(true)}
-              disabled={loading || !currentTurn}
+              disabled={loading || currentTurn?.status !== "called"}
             >
               No presento
             </button>
