@@ -9,9 +9,21 @@ import { LoginView } from './views/LoginView'
 import { TicketMark } from './components/TicketMark'
 import { RequireAuth } from './components/RequireAuth'
 import { AuthProvider } from './contexts/AuthContext'
+import { useAuth } from './contexts/useAuth'
 import './App.css'
 
 const STAFF_ROLES = [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.CASHIER]
+
+function AuthStatus() {
+  const { firebaseUser, signOutUser } = useAuth()
+  if (!firebaseUser) return null
+  return (
+    <div className="auth-status-bar">
+      <span className="auth-status-email">{firebaseUser.email}</span>
+      <button className="auth-status-signout" onClick={() => signOutUser()}>Cerrar sesión</button>
+    </div>
+  )
+}
 
 function App() {
   return (
@@ -35,6 +47,7 @@ function App() {
                   <li><NavLink to="/terminal">Terminal</NavLink></li>
                   <li><NavLink to="/admin">Admin</NavLink></li>
                 </ul>
+                <AuthStatus />
               </nav>
 
               <Routes>
