@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useParams, Navigate } from "react-router-dom";
 import type { Turn, Terminal } from "shared";
 import { db } from "../lib/firebase";
@@ -13,15 +14,9 @@ import {
   apiUpdateTerminal,
 } from "../lib/api";
 import { toDate } from "../lib/dates";
-
-const STATUS_LABELS: Record<string, string> = {
-  waiting: "Esperando",
-  called: "Llamado",
-  attending: "En atención",
-  finished: "Finalizado",
-  no_show: "No presentado",
-  cancelled: "Cancelado",
-};
+import { STATUS_LABELS } from "../lib/turnStatusLabels";
+import { usePipWindow } from "../hooks/usePipWindow";
+import { FloatingTerminalPanel } from "../components/FloatingTerminalPanel";
 
 export function TerminalView() {
   const { terminalId } = useParams<{ terminalId: string }>();
@@ -36,6 +31,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [confirmingNoShow, setConfirmingNoShow] = useState(false);
+  const { isSupported: pipSupported, pipWindow, openPipWindow } = usePipWindow();
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, "terminals", terminalId), (snap) => {
@@ -194,6 +190,12 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     }
   };
 
+  const canCallNext = !loading && !!terminal && terminal.status !== "offline";
+  const canStart = !loading && currentTurn?.status === "called";
+  const canFinish = !loading && currentTurn?.status === "attending";
+  const canRecall = !loading && currentTurn?.status === "called";
+  const canNoShow = !loading && currentTurn?.status === "called";
+
   return (
     <div className="term">
       {/* Sidebar */}
@@ -209,24 +211,30 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           </button>
         </div>
 
-        <div className="term-actions">
+        {pipSupported && (
           <button
-            className="term-btn term-btn-primary"
-            onClick={handleCallNext}
-            disabled={loading || !terminal || terminal.status === "offline"}
+            className="term-pip-btn"
+            onClick={() => (pipWindow ? pipWindow.focus() : openPipWindow())}
+            title="Abrir ventana flotante"
           >
+            {pipWindow ? "● Ventana flotante abierta" : "Abrir ventana flotante"}
+          </button>
+        )}
+
+        <div className="term-actions">
+          <button className="term-btn term-btn-primary" onClick={handleCallNext} disabled={!canCallNext}>
             Llamar siguiente
           </button>
-          <button className="term-btn term-btn-default" onClick={handleStartTurn} disabled={loading || currentTurn?.status !== "called"}>
+          <button className="term-btn term-btn-default" onClick={handleStartTurn} disabled={!canStart}>
             Iniciar atencion
           </button>
-          <button className="term-btn term-btn-success" onClick={handleFinishTurn} disabled={loading || currentTurn?.status !== "attending"}>
+          <button className="term-btn term-btn-success" onClick={handleFinishTurn} disabled={!canFinish}>
             Finalizar
           </button>
 
           <div className="term-actions-divider"></div>
 
-          <button className="term-btn term-btn-outline" onClick={handleRecallTurn} disabled={loading || currentTurn?.status !== "called"}>
+          <button className="term-btn term-btn-outline" onClick={handleRecallTurn} disabled={!canRecall}>
             Re-llamar
           </button>
           {confirmingNoShow ? (
@@ -240,11 +248,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
               </button>
             </div>
           ) : (
-            <button
-              className="term-btn term-btn-danger"
-              onClick={() => setConfirmingNoShow(true)}
-              disabled={loading || currentTurn?.status !== "called"}
-            >
+            <button className="term-btn term-btn-danger" onClick={() => setConfirmingNoShow(true)} disabled={!canNoShow}>
               No presento
             </button>
           )}
@@ -301,6 +305,29 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           {message.text}
         </div>
       )}
+
+      {pipWindow &&
+        createPortal(
+          <FloatingTerminalPanel
+            pipWindow={pipWindow}
+            terminal={terminal}
+            currentTurn={currentTurn}
+            confirmingNoShow={confirmingNoShow}
+            canCallNext={canCallNext}
+            canStart={canStart}
+            canFinish={canFinish}
+            canRecall={canRecall}
+            canNoShow={canNoShow}
+            onCallNext={handleCallNext}
+            onStartTurn={handleStartTurn}
+            onFinishTurn={handleFinishTurn}
+            onRecallTurn={handleRecallTurn}
+            onRequestNoShow={() => setConfirmingNoShow(true)}
+            onConfirmNoShow={handleConfirmNoShow}
+            onCancelNoShow={() => setConfirmingNoShow(false)}
+          />,
+          pipWindow.document.body
+        )}
 
       <style>{`
         .term {
@@ -370,6 +397,24 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
         .term-pause-btn:hover:not(:disabled) {
           border-color: var(--text-light);
           color: var(--text);
+        }
+
+        .term-pip-btn {
+          padding: 0.5rem 0.75rem;
+          background: transparent;
+          border: 1px dashed var(--border);
+          border-radius: var(--radius-sm);
+          color: var(--text-muted);
+          font-family: var(--font-body);
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .term-pip-btn:hover {
+          border-color: var(--accent);
+          color: var(--accent);
         }
 
         .term-id-name {
