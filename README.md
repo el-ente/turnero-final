@@ -124,6 +124,12 @@ GET /getCurrentTurn?memberNumber=12345
 
 `getCurrentTurn` es también el mecanismo de recuperación: un socio puede ingresar su número en cualquier Totem y recuperar su turno activo (waiting/called/attending), sin depender de `localStorage` del dispositivo.
 
+```bash
+POST /cancelTurn
+  { turnId }
+  → { success: true }
+```
+
 ### Terminal Operations
 
 ```bash
@@ -140,9 +146,25 @@ POST /recallTurn { terminalId, turnId }
 ```bash
 GET /getQueueStats?queueId=queue-1
   → { totalTodayCreated, waitingCount, finishedCount, avgWaitTimeSeconds }
+```
 
-PUT /updateQueueConfig?queueId=queue-1
-  { name, type, reenqueueConfig, priorityWeight }
+CRUD completo para sectors, queues y terminals (`GET` lista, `POST` crea, `PUT ?<id>=...` actualiza, `DELETE ?<id>=...` elimina):
+
+```bash
+POST   /createSector    { name, description? }
+GET    /listSectors
+PUT    /updateSector?sectorId=sector-1     { name?, description? }
+DELETE /deleteSector?sectorId=sector-1
+
+POST   /createQueue     { sectorId, name, type, reenqueueConfig, priorityWeight?, servedBy, active }
+GET    /listQueues
+PUT    /updateQueue?queueId=queue-1        { name?, type?, reenqueueConfig?, priorityWeight? }
+DELETE /deleteQueue?queueId=queue-1
+
+POST   /createTerminal  { name, sectorIds, activeQueueIds, servingStrategy, strategyConfig }
+GET    /listTerminals
+PUT    /updateTerminal?terminalId=terminal-1   { name?, sectorIds?, activeQueueIds?, servingStrategy?, strategyConfig? }
+DELETE /deleteTerminal?terminalId=terminal-1
 ```
 
 ## 🧪 Testing
@@ -158,7 +180,7 @@ pnpm -F functions test:watch
 pnpm -F functions test:coverage
 ```
 
-**20 tests** covering turnService, queueService, terminalService, statsService.
+**61 tests** covering turnService, queueService, terminalService, statsService, adminService.
 
 ### Testing Manual
 
