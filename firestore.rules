@@ -1,18 +1,47 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2026, 10, 31);
+    // All writes happen through Cloud Functions using the Admin SDK, which
+    // bypasses these rules entirely. Client-side Firestore access is
+    // read-only real-time listeners (Totem/Display/Terminal/Admin views).
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // Totem (ticket kiosk) and the public Display screen read these with no
+    // login at all, so they stay open to anyone.
+    match /sectors/{sectorId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /queues/{queueId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /terminals/{terminalId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /turns/{turnId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Staff profiles (role + sector assignment). A user can always read
+    // their own doc (needed to bootstrap the UI after login); admin/
+    // supervisor can read anyone's to run the Users admin screen.
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || myRole() in ['admin', 'supervisor']);
+      allow write: if false;
     }
   }
 }

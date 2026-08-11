@@ -16,6 +16,14 @@ export function nextRatioCounterState(config: RatioBasedConfig, isPriority: bool
   return {normalCounterState: normal, priorityCounterState: priority};
 }
 
+export async function getTerminalById(terminalId: string): Promise<Terminal> {
+  const terminalDoc = await db.collection("terminals").doc(terminalId).get();
+  if (!terminalDoc.exists) {
+    throw new NotFoundError(`Terminal ${terminalId} not found`);
+  }
+  return terminalDoc.data() as Terminal;
+}
+
 export async function getNextTurn(terminalId: string): Promise<Turn | null> {
   const terminalDoc = await db.collection("terminals").doc(terminalId).get();
   if (!terminalDoc.exists) {

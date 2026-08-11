@@ -1,3 +1,5 @@
+import { auth } from "./firebase";
+
 // Base URL for Cloud Functions
 // In development, this points to emulator (localhost:5001)
 // In production, this points to deployed functions
@@ -25,11 +27,19 @@ export async function callFunction<T>(
     });
   }
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  // Totem/Display reads (and the endpoints they call) stay unauthenticated;
+  // every other call attaches the signed-in user's ID token if there is one.
+  if (auth.currentUser) {
+    headers.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
+  }
+
   const options: RequestInit = {
     method,
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
   };
 
   if (body) {
@@ -48,7 +58,7 @@ export async function callFunction<T>(
   return (await response.json()) as T;
 }
 
-import type { Turn, Sector, Queue, Terminal } from "shared";
+import type { Turn, Sector, Queue, Terminal, AppUser, UserRole, UserStatus } from "shared";
 
 // Turn API
 export async function createTurn(
@@ -150,4 +160,28 @@ export async function apiUpdateTerminal(terminalId: string, data: Partial<Termin
 
 export async function apiDeleteTerminal(terminalId: string) {
   return callFunction<void>("deleteTerminal", "DELETE", undefined, { terminalId });
+}
+
+// Users / auth
+export async function apiBootstrapUser() {
+  return callFunction<AppUser>("bootstrapUser", "POST");
+}
+
+export async function apiListUsers() {
+  return callFunction<AppUser[]>("listUsers", "GET");
+}
+
+export async function apiInviteUser(data: { email: string; role: UserRole; assignedSectorIds?: string[] }) {
+  return callFunction<AppUser>("inviteUser", "POST", data);
+}
+
+export async function apiUpdateUserRole(
+  userId: string,
+  data: { role?: UserRole; assignedSectorIds?: string[]; status?: UserStatus }
+) {
+  return callFunction<AppUser>("updateUserRole", "PUT", data, { userId });
+}
+
+export async function apiDeleteUser(userId: string) {
+  return callFunction<void>("deleteUser", "DELETE", undefined, { userId });
 }

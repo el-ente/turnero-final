@@ -7,7 +7,11 @@ meta {
 delete {
   url: {{baseUrl}}/deleteQueue?queueId={{queueId}}
   body: none
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
 }
 
 params:query {

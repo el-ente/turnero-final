@@ -26,3 +26,15 @@ export class ConflictError extends BusinessError {
     super("CONFLICT", message, 409);
   }
 }
+
+export class UnauthorizedError extends BusinessError {
+  constructor(message = "Authentication required") {
+    super("UNAUTHORIZED", message, 401);
+  }
+}
+
+export class ForbiddenError extends BusinessError {
+  constructor(message = "Insufficient permissions") {
+    super("FORBIDDEN", message, 403);
+  }
+}

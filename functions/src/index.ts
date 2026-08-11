@@ -14,6 +14,9 @@ import {
   createQueueHandler, listQueuesHandler, updateQueueHandler, deleteQueueHandler,
   createTerminalHandler, listTerminalsHandler, updateTerminalHandler, deleteTerminalHandler,
 } from "./controllers/adminController";
+import {
+  bootstrapUserHandler, listUsersHandler, inviteUserHandler, updateUserRoleHandler, deleteUserHandler,
+} from "./controllers/userController";
 
 setGlobalOptions({maxInstances: 10});
 
@@ -50,3 +53,10 @@ export const createTerminal = createTerminalHandler;
 export const listTerminals = listTerminalsHandler;
 export const updateTerminal = updateTerminalHandler;
 export const deleteTerminal = deleteTerminalHandler;
+
+// Users / auth
+export const bootstrapUser = bootstrapUserHandler;
+export const listUsers = listUsersHandler;
+export const inviteUser = inviteUserHandler;
+export const updateUserRole = updateUserRoleHandler;
+export const deleteUser = deleteUserHandler;

@@ -1,11 +1,11 @@
 meta {
-  name: Get Queue Stats
+  name: Delete User
   type: http
   seq: 5
 }
 
-get {
-  url: {{baseUrl}}/getQueueStats?queueId={{queueId}}
+delete {
+  url: {{baseUrl}}/deleteUser?userId={{userId}}
   body: none
   auth: bearer
 }
@@ -15,5 +15,5 @@ auth:bearer {
 }
 
 params:query {
-  queueId:
+  userId:
 }

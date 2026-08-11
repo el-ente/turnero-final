@@ -1,20 +1,26 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Terminal } from "shared";
+import { canAccessTerminal } from "shared";
 import { db } from "../lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
+import { useAuth } from "../contexts/useAuth";
 
 export function TerminalSelector() {
-  const [terminals, setTerminals] = useState<Terminal[]>([]);
+  const [allTerminals, setAllTerminals] = useState<Terminal[]>([]);
   const navigate = useNavigate();
+  const { appUser } = useAuth();
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "terminals"), (snapshot) => {
       const list = snapshot.docs.map((doc) => doc.data() as Terminal);
-      setTerminals(list.sort((a, b) => a.name.localeCompare(b.name)));
+      setAllTerminals(list.sort((a, b) => a.name.localeCompare(b.name)));
     });
     return unsubscribe;
   }, []);
+
+  // A cashier only sees terminals in their assigned sector(s); admin/supervisor see all.
+  const terminals = appUser ? allTerminals.filter((t) => canAccessTerminal(appUser, t)) : [];
 
   return (
     <div className="tsel">
@@ -23,7 +29,11 @@ export function TerminalSelector() {
         <p className="tsel-subtitle">Elegí tu puesto de atención</p>
 
         {terminals.length === 0 ? (
-          <div className="tsel-empty">No hay terminales configuradas</div>
+          <div className="tsel-empty">
+            {allTerminals.length === 0
+              ? "No hay terminales configuradas"
+              : "No tenés ningún sector asignado. Pedile a un administrador que te asigne uno."}
+          </div>
         ) : (
           <div className="tsel-list">
             {terminals.map((t) => (

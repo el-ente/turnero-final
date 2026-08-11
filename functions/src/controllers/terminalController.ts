@@ -1,9 +1,24 @@
 import {onRequest} from "firebase-functions/v2/https";
-import {getNextTurn, callTurn, startTurn, finishTurn, recallTurn, handleNoShow} from "../services/terminalService";
-import {BusinessError} from "../utils/errors";
+import {AppUser, UserRole, canAccessTerminal} from "shared";
+import {
+  getNextTurn, callTurn, startTurn, finishTurn, recallTurn, handleNoShow, getTerminalById,
+} from "../services/terminalService";
+import {BusinessError, ForbiddenError} from "../utils/errors";
 import {logger} from "../config/firebase-admin";
+import {requireRole} from "../middleware/auth";
 
-export const nextTurnHandler = onRequest({cors: true}, async (req, res) => {
+const STAFF_ROLES = [UserRole.CASHIER, UserRole.SUPERVISOR, UserRole.ADMIN];
+
+// A cashier may only operate terminals in their assigned sector(s); admin
+// and supervisor can operate any terminal.
+async function assertTerminalAccess(user: AppUser, terminalId: string) {
+  const terminal = await getTerminalById(terminalId);
+  if (!canAccessTerminal(user, terminal)) {
+    throw new ForbiddenError(`Not assigned to terminal ${terminalId}'s sector`);
+  }
+}
+
+export const nextTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -15,6 +30,8 @@ export const nextTurnHandler = onRequest({cors: true}, async (req, res) => {
       res.status(400).json({error: "terminalId is required"});
       return;
     }
+
+    await assertTerminalAccess(user, terminalId);
 
     const turn = await getNextTurn(terminalId);
     if (!turn) {
@@ -31,9 +48,9 @@ export const nextTurnHandler = onRequest({cors: true}, async (req, res) => {
       res.status(500).json({error: "Internal server error"});
     }
   }
-});
+}));
 
-export const callTurnHandler = onRequest({cors: true}, async (req, res) => {
+export const callTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -45,6 +62,8 @@ export const callTurnHandler = onRequest({cors: true}, async (req, res) => {
       res.status(400).json({error: "terminalId and turnId are required"});
       return;
     }
+
+    await assertTerminalAccess(user, terminalId);
 
     await callTurn(terminalId, turnId);
     res.status(200).json({success: true});
@@ -56,9 +75,9 @@ export const callTurnHandler = onRequest({cors: true}, async (req, res) => {
       res.status(500).json({error: "Internal server error"});
     }
   }
-});
+}));
 
-export const startTurnHandler = onRequest({cors: true}, async (req, res) => {
+export const startTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -70,6 +89,8 @@ export const startTurnHandler = onRequest({cors: true}, async (req, res) => {
       res.status(400).json({error: "terminalId and turnId are required"});
       return;
     }
+
+    await assertTerminalAccess(user, terminalId);
 
     await startTurn(terminalId, turnId);
     res.status(200).json({success: true});
@@ -81,9 +102,9 @@ export const startTurnHandler = onRequest({cors: true}, async (req, res) => {
       res.status(500).json({error: "Internal server error"});
     }
   }
-});
+}));
 
-export const finishTurnHandler = onRequest({cors: true}, async (req, res) => {
+export const finishTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -95,6 +116,8 @@ export const finishTurnHandler = onRequest({cors: true}, async (req, res) => {
       res.status(400).json({error: "terminalId and turnId are required"});
       return;
     }
+
+    await assertTerminalAccess(user, terminalId);
 
     await finishTurn(terminalId, turnId);
     res.status(200).json({success: true});
@@ -106,9 +129,9 @@ export const finishTurnHandler = onRequest({cors: true}, async (req, res) => {
       res.status(500).json({error: "Internal server error"});
     }
   }
-});
+}));
 
-export const recallTurnHandler = onRequest({cors: true}, async (req, res) => {
+export const recallTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -120,6 +143,8 @@ export const recallTurnHandler = onRequest({cors: true}, async (req, res) => {
       res.status(400).json({error: "terminalId and turnId are required"});
       return;
     }
+
+    await assertTerminalAccess(user, terminalId);
 
     await recallTurn(terminalId, turnId);
     res.status(200).json({success: true});
@@ -131,9 +156,9 @@ export const recallTurnHandler = onRequest({cors: true}, async (req, res) => {
       res.status(500).json({error: "Internal server error"});
     }
   }
-});
+}));
 
-export const noShowHandler = onRequest({cors: true}, async (req, res) => {
+export const noShowHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -146,6 +171,8 @@ export const noShowHandler = onRequest({cors: true}, async (req, res) => {
       return;
     }
 
+    await assertTerminalAccess(user, terminalId);
+
     await handleNoShow(terminalId, turnId);
     res.status(200).json({success: true});
   } catch (error) {
@@ -156,4 +183,4 @@ export const noShowHandler = onRequest({cors: true}, async (req, res) => {
       res.status(500).json({error: "Internal server error"});
     }
   }
-});
+}));

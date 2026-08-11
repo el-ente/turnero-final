@@ -1,0 +1,26 @@
+meta {
+  name: Update User Role
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/updateUserRole?userId={{userId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+params:query {
+  userId:
+}
+
+body:json {
+  {
+    "role": "cashier",
+    "assignedSectorIds": []
+  }
+}

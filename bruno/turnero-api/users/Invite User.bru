@@ -1,11 +1,11 @@
 meta {
-  name: Start Turn
+  name: Invite User
   type: http
   seq: 3
 }
 
 post {
-  url: {{baseUrl}}/startTurn
+  url: {{baseUrl}}/inviteUser
   body: json
   auth: bearer
 }
@@ -16,7 +16,8 @@ auth:bearer {
 
 body:json {
   {
-    "terminalId": "",
-    "turnId": ""
+    "email": "",
+    "role": "cashier",
+    "assignedSectorIds": []
   }
 }

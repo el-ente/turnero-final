@@ -1,12 +1,20 @@
 import { useState, useEffect } from "react";
-import type { Sector, Queue, Terminal } from "shared";
+import type { Sector, Queue, Terminal, AppUser } from "shared";
+import { UserRole, UserStatus } from "shared";
 import { AdminModal } from "../components/AdminModal";
 import {
   getQueueStats,
   apiListSectors, apiCreateSector, apiUpdateSector, apiDeleteSector,
   apiListQueues, apiCreateQueue, apiUpdateQueue, apiDeleteQueue,
   apiListTerminals, apiCreateTerminal, apiUpdateTerminal, apiDeleteTerminal,
+  apiListUsers, apiInviteUser, apiUpdateUserRole, apiDeleteUser,
 } from "../lib/api";
+
+const ROLE_LABELS: Record<string, string> = {
+  [UserRole.ADMIN]: "Admin",
+  [UserRole.SUPERVISOR]: "Supervisor",
+  [UserRole.CASHIER]: "Cajero",
+};
 
 const QUEUE_TYPE_LABELS: Record<string, string> = { normal: "Normal", priority: "Prioritaria" };
 
@@ -30,13 +38,17 @@ type ModalMode =
   | { type: "delete-queue"; entity: Queue }
   | { type: "create-terminal" }
   | { type: "edit-terminal"; entity: Terminal }
-  | { type: "delete-terminal"; entity: Terminal };
+  | { type: "delete-terminal"; entity: Terminal }
+  | { type: "invite-user" }
+  | { type: "edit-user"; entity: AppUser }
+  | { type: "delete-user"; entity: AppUser };
 
 export function AdminView() {
-  const [tab, setTab] = useState<"queues" | "terminals" | "sectors" | "stats">("queues");
+  const [tab, setTab] = useState<"queues" | "terminals" | "sectors" | "stats" | "users">("queues");
   const [queues, setQueues] = useState<Queue[]>([]);
   const [terminals, setTerminals] = useState<Terminal[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [statsData, setStatsData] = useState<any>(null);
   const [selectedQueueId, setSelectedQueueId] = useState<string>("");
   const [modal, setModal] = useState<ModalMode>(null);
@@ -51,10 +63,11 @@ export function AdminView() {
 
   const loadData = async () => {
     try {
-      const [s, q, t] = await Promise.all([apiListSectors(), apiListQueues(), apiListTerminals()]);
+      const [s, q, t, u] = await Promise.all([apiListSectors(), apiListQueues(), apiListTerminals(), apiListUsers()]);
       setSectors(s);
       setQueues(q);
       setTerminals(t);
+      setUsers(u);
     } catch (err) {
       showToast("error", "Error cargando datos");
     } finally {
@@ -90,6 +103,7 @@ export function AdminView() {
     { key: "queues" as const, label: "Colas" },
     { key: "terminals" as const, label: "Terminales" },
     { key: "sectors" as const, label: "Sectores" },
+    { key: "users" as const, label: "Usuarios" },
     { key: "stats" as const, label: "Estadísticas" },
   ];
 
@@ -287,6 +301,59 @@ export function AdminView() {
           </div>
         )}
 
+        {/* ─── Users ─── */}
+        {tab === "users" && (
+          <div className="adm-section">
+            <div className="adm-section-top">
+              <div className="adm-section-heading">
+                <h2>Gestión de Usuarios</h2>
+                <span className="adm-count-stamp">{users.length} registrado{users.length !== 1 ? "s" : ""}</span>
+              </div>
+              <button className="adm-btn-new" onClick={() => setModal({ type: "invite-user" })}>+ Invitar Usuario</button>
+            </div>
+            {loadingData ? (
+              <div className="adm-empty"><p className="adm-empty-title">Cargando...</p></div>
+            ) : users.length === 0 ? (
+              <div className="adm-empty">
+                <p className="adm-empty-title">Todavía no hay usuarios.</p>
+                <p className="adm-empty-sub">Invitá a alguien por email para que pueda operar una terminal.</p>
+              </div>
+            ) : (
+            <div className="adm-table-wrap">
+              <table className="adm-table">
+                <thead>
+                  <tr>
+                    <th>Email</th>
+                    <th>Rol</th>
+                    <th>Sectores</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id}>
+                      <td className="adm-bold">{u.email}</td>
+                      <td>{ROLE_LABELS[u.role] || u.role}</td>
+                      <td>
+                        {u.role === UserRole.ADMIN || u.role === UserRole.SUPERVISOR
+                          ? "Todos"
+                          : u.assignedSectorIds.map(getSectorName).join(", ") || "—"}
+                      </td>
+                      <td>{u.status === UserStatus.ACTIVE ? "Activo" : "Pendiente"}</td>
+                      <td className="adm-actions-cell">
+                        <button className="adm-link-btn" onClick={() => setModal({ type: "edit-user", entity: u })}>Editar</button>
+                        <button className="adm-link-btn adm-link-danger" onClick={() => setModal({ type: "delete-user", entity: u })}>Eliminar</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
+          </div>
+        )}
+
         {/* ─── Stats ─── */}
         {tab === "stats" && statsData && (
           <div className="adm-section">
@@ -439,6 +506,51 @@ export function AdminView() {
           onConfirm={async () => {
             setSaving(true);
             try { await apiDeleteTerminal(modal.entity.id); showToast("success", "Terminal eliminada"); setModal(null); loadData(); }
+            catch (e) { showToast("error", e instanceof Error ? e.message : "Error"); }
+            finally { setSaving(false); }
+          }}
+        />
+      )}
+
+      {modal?.type === "invite-user" && (
+        <UserFormModal
+          sectors={sectors}
+          onClose={() => setModal(null)}
+          saving={saving}
+          onSave={async (data) => {
+            setSaving(true);
+            try { await apiInviteUser(data); showToast("success", "Invitación creada"); setModal(null); loadData(); }
+            catch (e) { showToast("error", e instanceof Error ? e.message : "Error"); }
+            finally { setSaving(false); }
+          }}
+        />
+      )}
+
+      {modal?.type === "edit-user" && (
+        <UserFormModal
+          user={modal.entity}
+          sectors={sectors}
+          onClose={() => setModal(null)}
+          saving={saving}
+          onSave={async (data) => {
+            setSaving(true);
+            try {
+              await apiUpdateUserRole(modal.entity.id, { role: data.role, assignedSectorIds: data.assignedSectorIds });
+              showToast("success", "Usuario actualizado"); setModal(null); loadData();
+            } catch (e) { showToast("error", e instanceof Error ? e.message : "Error"); }
+            finally { setSaving(false); }
+          }}
+        />
+      )}
+
+      {modal?.type === "delete-user" && (
+        <ConfirmDeleteModal
+          label={`el acceso de "${modal.entity.email}"`}
+          onClose={() => setModal(null)}
+          saving={saving}
+          onConfirm={async () => {
+            setSaving(true);
+            try { await apiDeleteUser(modal.entity.id); showToast("success", "Usuario eliminado"); setModal(null); loadData(); }
             catch (e) { showToast("error", e instanceof Error ? e.message : "Error"); }
             finally { setSaving(false); }
           }}
@@ -657,6 +769,79 @@ function TerminalFormModal({ terminal, sectors, queues, onClose, onSave, saving 
           }
           onSave({ name: name.trim(), sectorIds: selectedSectorIds, activeQueueIds: selectedQueueIds, servingStrategy: strategy, strategyConfig });
         }}>
+          {saving ? "Guardando..." : "Guardar"}
+        </button>
+      </div>
+    </AdminModal>
+  );
+}
+
+function UserFormModal({ user, sectors, onClose, onSave, saving }: {
+  user?: AppUser;
+  sectors: Sector[];
+  onClose: () => void;
+  onSave: (data: { email: string; role: UserRole; assignedSectorIds: string[] }) => void;
+  saving: boolean;
+}) {
+  const [email, setEmail] = useState(user?.email || "");
+  const [role, setRole] = useState<UserRole>(user?.role || UserRole.CASHIER);
+  const [selectedSectorIds, setSelectedSectorIds] = useState<string[]>(user?.assignedSectorIds || []);
+
+  const toggleSector = (id: string) => {
+    setSelectedSectorIds((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
+  };
+
+  const needsSectors = role === UserRole.CASHIER;
+  const emailValid = /\S+@\S+\.\S+/.test(email);
+
+  return (
+    <AdminModal title={user ? "Editar Usuario" : "Invitar Usuario"} onClose={onClose}>
+      <div className="form-group">
+        <label className="form-label">Email</label>
+        <input
+          className="form-input"
+          type="email"
+          value={email}
+          disabled={!!user}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="persona@ejemplo.com"
+        />
+        {!user && <p className="form-hint">Cuando esa persona inicie sesión con Google, el acceso queda activo automáticamente.</p>}
+      </div>
+      <div className="form-group">
+        <label className="form-label">Rol</label>
+        <select className="form-select" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+          <option value={UserRole.CASHIER}>Cajero</option>
+          <option value={UserRole.SUPERVISOR}>Supervisor</option>
+          <option value={UserRole.ADMIN}>Admin</option>
+        </select>
+        {role !== UserRole.CASHIER && <p className="form-hint">Admin y Supervisor operan cualquier terminal, sin restricción de sector.</p>}
+      </div>
+      {needsSectors && (
+        <div className="form-group">
+          <label className="form-label">Sectores asignados</label>
+          <div className="form-multi-select">
+            {sectors.map((s) => (
+              <span key={s.id} className={`form-chip ${selectedSectorIds.includes(s.id) ? "active" : ""}`} onClick={() => toggleSector(s.id)}>
+                {s.name}
+              </span>
+            ))}
+            {sectors.length === 0 && <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>Creá un sector primero</span>}
+          </div>
+        </div>
+      )}
+      {!emailValid ? (
+        <p className="form-hint">Ingresá un email válido para guardar.</p>
+      ) : needsSectors && selectedSectorIds.length === 0 && (
+        <p className="form-hint">Un cajero necesita al menos un sector asignado.</p>
+      )}
+      <div className="form-actions">
+        <button className="form-btn form-btn-cancel" onClick={onClose}>Cancelar</button>
+        <button
+          className="form-btn form-btn-save"
+          disabled={!emailValid || (needsSectors && selectedSectorIds.length === 0) || saving}
+          onClick={() => onSave({ email: email.trim(), role, assignedSectorIds: needsSectors ? selectedSectorIds : [] })}
+        >
           {saving ? "Guardando..." : "Guardar"}
         </button>
       </div>

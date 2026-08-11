@@ -8,6 +8,7 @@ Un sistema de gestión de turnos moderno construido con Firebase y React. Propor
 - **Estrategias Inteligentes**: FIFO global o basado en ratios para balancear prioridades
 - **Reencauzamiento**: Reintentos automáticos para clientes que no se presentan
 - **Múltiples Interfaces**: Totem web, pantalla pública, terminal de operador, admin dashboard
+- **Roles y Permisos**: Login con Google (admin/supervisor/cajero), cajero restringido a sus sectores asignados
 - **Real-time**: Actualizaciones en tiempo real con Firestore listeners
 - **Modular**: Arquitectura de servicios reutilizable y testeable
 
@@ -73,6 +74,8 @@ VITE_FIREBASE_APP_ID=<tu-app-id>
 
 Valores: `firebase apps:sdkconfig web <APP_ID> --project turnero-1212-dev`.
 
+Para las Functions (no versionado, `functions/.env` o config del proyecto): `ADMIN_ALLOWLIST=persona@ejemplo.com,otra@ejemplo.com` — emails que se auto-provisionan como **admin** en su primer login con Google (bootstrap del primer usuario; después, ese admin invita al resto desde el panel Admin → Usuarios).
+
 ### Desarrollo
 
 ```bash
@@ -100,16 +103,30 @@ Crea datos de prueba: 3 sectores (Farmacia, Perfumería, PAMI), 6 colas (regular
 
 ## 🎨 Vistas Frontend
 
-| Vista | URL | Propósito | Diseño |
-|-------|-----|-----------|--------|
-| **Totem** | `/` | Usuario final saca turno | Minimalista, colores vibrantes |
-| **Display** | `/display` | Pantalla pública de sala de espera | Brutal cyan/magenta, números ENORMES |
-| **Terminal** | `/terminal` | Operador atiende turnos | Industrial verde neon, panel de control |
-| **Admin** | `/admin` | Administrador configura sistema | Dashboard moderno azul/púrpura |
+| Vista | URL | Propósito | Diseño | Acceso |
+|-------|-----|-----------|--------|--------|
+| **Totem** | `/` | Usuario final saca turno | Minimalista, colores vibrantes | Público |
+| **Display** | `/display` | Pantalla pública de sala de espera | Brutal cyan/magenta, números ENORMES | Público |
+| **Terminal** | `/terminal` | Operador atiende turnos | Industrial verde neon, panel de control | Login (admin/supervisor/cajero) |
+| **Admin** | `/admin` | Administrador configura sistema | Dashboard moderno azul/púrpura | Login (admin) |
 
 ## 📡 API Endpoints
 
+### Autenticación
+
+Login con Google (Firebase Auth). Todo endpoint que no sea de Totem lleva `Authorization: Bearer <idToken>`; sin ese header, o con una cuenta todavía no activada por un admin, responde `401`. Sin el rol requerido, `403`.
+
+| Rol | Puede |
+|-----|-------|
+| **admin** | Todo: CRUD de sectors/queues/terminals, gestión de usuarios, ver stats, operar cualquier terminal |
+| **supervisor** | Ver stats, operar cualquier terminal (sin CRUD estructural ni gestión de usuarios) |
+| **cajero** | Operar terminales solo en sus `assignedSectorIds` |
+
+El filtro de sector es la respuesta a "no quiero que cualquier cajero pueda elegir cualquier terminal": se define por usuario (`assignedSectorIds`), no por terminal, así un cajero que atiende varios sectores no necesita más de un rol.
+
 ### Turn Management
+
+Sin auth — Totem es un kiosco público y `cancelTurn` es autoservicio del cliente sobre su propio turno.
 
 El **número de ticket es el número de socio** (`memberNumber`, entero de 1 a 99999) que el cliente ingresa en el Totem — no es un contador secuencial diario. Es externo y no se valida contra ningún padrón; la app solo verifica el rango.
 
@@ -132,6 +149,8 @@ POST /cancelTurn
 
 ### Terminal Operations
 
+Requiere login como admin/supervisor/cajero. Un cajero solo puede operar terminales en su(s) sector(es) asignado(s) — 403 si `terminalId` cae fuera de `assignedSectorIds`.
+
 ```bash
 POST /nextTurn { terminalId }
 POST /callTurn { terminalId, turnId }
@@ -142,6 +161,8 @@ POST /recallTurn { terminalId, turnId }
 ```
 
 ### Admin
+
+CRUD de sectors/queues/terminals: solo admin. `getQueueStats`: admin o supervisor.
 
 ```bash
 GET /getQueueStats?queueId=queue-1
@@ -167,6 +188,30 @@ PUT    /updateTerminal?terminalId=terminal-1   { name?, sectorIds?, activeQueueI
 DELETE /deleteTerminal?terminalId=terminal-1
 ```
 
+### Users
+
+`bootstrapUser`: cualquier cuenta autenticada (es la que crea/resuelve su propio perfil al loguearse). El resto: solo admin.
+
+```bash
+POST   /bootstrapUser
+  → { id, uid, email, role, assignedSectorIds, status, createdAt, updatedAt }
+  # Se llama automáticamente tras el login con Google. Primera vez:
+  # invitación pendiente por email -> la reclama; email en ADMIN_ALLOWLIST -> admin activo;
+  # si no, crea un perfil "pending" (sin permisos) para que un admin lo active.
+
+GET    /listUsers
+  → AppUser[]
+
+POST   /inviteUser      { email, role, assignedSectorIds? }
+  → AppUser   # status "pending" hasta que esa persona inicia sesión con ese email
+
+PUT    /updateUserRole?userId=<id>   { role?, assignedSectorIds?, status? }
+  → AppUser
+
+DELETE /deleteUser?userId=<id>
+  # Revoca acceso (borra el perfil; la cuenta de Google sigue existiendo, solo pierde permisos)
+```
+
 ## 🧪 Testing
 
 ```bash
@@ -180,14 +225,21 @@ pnpm -F functions test:watch
 pnpm -F functions test:coverage
 ```
 
-**61 tests** covering turnService, queueService, terminalService, statsService, adminService.
+**106 tests** covering turnService, queueService, terminalService, statsService, adminService, y la capa de auth (middleware + gating de cada endpoint protegido).
 
 ### Testing Manual
 
 ```bash
+# Público, sin token:
 curl -X POST http://localhost:5001/turnero-1212-dev/us-central1/createTurn \
   -H "Content-Type: application/json" \
   -d '{"queueId":"queue-1", "memberNumber":12345, "channel":"totem"}'
+
+# Protegido, requiere Bearer token (obtenido del cliente tras el login con Google):
+curl -X POST http://localhost:5001/turnero-1212-dev/us-central1/callTurn \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <idToken>" \
+  -d '{"terminalId":"terminal-1", "turnId":"turn-1"}'
 ```
 
 Ver datos en Firestore Emulator UI: http://localhost:4000
@@ -223,6 +275,7 @@ firebase deploy --project dev --only hosting:app
 - **queues**: { id, sectorId, name, type, reenqueueConfig, servedBy[], ... }
 - **terminals**: { id, name, sectorIds[], activeQueueIds[], servingStrategy, ... }
 - **turns**: { id, memberNumber, queueId, status, queuedAt, ... }
+- **users**: { id, uid?, email, role (`admin`\|`supervisor`\|`cashier`), assignedSectorIds[], status (`pending`\|`active`), createdAt, updatedAt } — `id` es el `uid` de Firebase Auth una vez activo; mientras está `pending` (invitado por email, todavía no logueado) es un id autogenerado.
 
 El ticket mostrado en Totem/Display/Terminal **es** `memberNumber` — no hay numeración secuencial diaria ni reset a medianoche. `queuedAt` es la clave de orden interna (= `createdAt` al crear el turno, se adelanta al reencolar por no-show) y reemplaza los antiguos `originalTurnNumber`/`currentTurnNumber`.
 
@@ -239,8 +292,8 @@ El ticket mostrado en Totem/Display/Terminal **es** `memberNumber` — no hay nu
 - [x] Phase 1-6: Backend (types, config, CRUD, operations)
 - [x] Phase 7-10: Frontend (4 vistas)
 - [x] Phase 11: Unit tests
-- [ ] Phase 12: Firestore security rules (actual: `firestore.rules` es un stopgap permisivo, expira 2026-10-31 — sin fix real, todo acceso queda denegado después de esa fecha)
-- [ ] Phase 13: Firebase Auth (Google Sign-In ya habilitado en los 3 proyectos vía `firebase.json`, pero no integrado en el frontend todavía)
+- [x] Phase 12: Firestore security rules (`firestore.rules` real: lectura pública de sectors/queues/terminals/turns para Totem/Display; `users` restringido al propio doc o admin/supervisor; toda escritura pasa por Cloud Functions con Admin SDK, así que las rules la deniegan siempre)
+- [x] Phase 13: Firebase Auth (Google Sign-In, roles admin/supervisor/cashier, cajero restringido a `assignedSectorIds`). Pendiente como follow-up: UI dedicada para las capacidades de supervisor (hoy solo tiene permiso de ver stats vía backend, sin pantalla propia) y refresco de token en la ventana flotante PiP más allá de lo que ya cubre compartir el mismo contexto JS
 - [ ] Phase 14: WhatsApp integration
 - [ ] Phase 15: Mobile app
 
