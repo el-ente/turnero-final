@@ -1,19 +1,25 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { Suspense, lazy } from 'react'
 import { UserRole } from 'shared'
 import { TotemView } from './views/TotemView'
 import { PublicDisplay } from './views/PublicDisplay'
-import { TerminalView } from './views/TerminalView'
-import { TerminalSelector } from './views/TerminalSelector'
 import { WebTicketView } from './views/WebTicketView'
-import { AdminView } from './views/AdminView'
-import { LoginView } from './views/LoginView'
 import { TicketMark } from './components/TicketMark'
 import { RequireAuth } from './components/RequireAuth'
 import { AuthProvider } from './contexts/AuthContext'
 import { useAuth } from './contexts/useAuth'
 import './App.css'
 
+const TerminalSelector = lazy(() => import('./views/TerminalSelector').then((m) => ({ default: m.TerminalSelector })))
+const TerminalView = lazy(() => import('./views/TerminalView').then((m) => ({ default: m.TerminalView })))
+const AdminView = lazy(() => import('./views/AdminView').then((m) => ({ default: m.AdminView })))
+const LoginView = lazy(() => import('./views/LoginView').then((m) => ({ default: m.LoginView })))
+
 const STAFF_ROLES = [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.CASHIER]
+
+function RouteFallback() {
+  return <div className="auth-status">Cargando…</div>
+}
 
 function AuthStatus() {
   const { firebaseUser, signOutUser } = useAuth()
@@ -52,23 +58,25 @@ function App() {
                 <AuthStatus />
               </nav>
 
-              <Routes>
-                {/* Totem is the public kiosk, no auth */}
-                <Route path="/" element={<TotemView />} />
-                {/* Mi Turno is the public web channel — take/track a ticket from your own device, no auth */}
-                <Route path="/mi-turno" element={<WebTicketView />} />
-                <Route path="/mi-turno/:turnId" element={<WebTicketView />} />
-                <Route path="/login" element={<LoginView />} />
-                <Route path="/terminal" element={
-                  <RequireAuth roles={STAFF_ROLES}><TerminalSelector /></RequireAuth>
-                } />
-                <Route path="/terminal/:terminalId" element={
-                  <RequireAuth roles={STAFF_ROLES}><TerminalView /></RequireAuth>
-                } />
-                <Route path="/admin" element={
-                  <RequireAuth roles={[UserRole.ADMIN]}><AdminView /></RequireAuth>
-                } />
-              </Routes>
+              <Suspense fallback={<RouteFallback />}>
+                <Routes>
+                  {/* Totem is the public kiosk, no auth */}
+                  <Route path="/" element={<TotemView />} />
+                  {/* Mi Turno is the public web channel — take/track a ticket from your own device, no auth */}
+                  <Route path="/mi-turno" element={<WebTicketView />} />
+                  <Route path="/mi-turno/:turnId" element={<WebTicketView />} />
+                  <Route path="/login" element={<LoginView />} />
+                  <Route path="/terminal" element={
+                    <RequireAuth roles={STAFF_ROLES}><TerminalSelector /></RequireAuth>
+                  } />
+                  <Route path="/terminal/:terminalId" element={
+                    <RequireAuth roles={STAFF_ROLES}><TerminalView /></RequireAuth>
+                  } />
+                  <Route path="/admin" element={
+                    <RequireAuth roles={[UserRole.ADMIN]}><AdminView /></RequireAuth>
+                  } />
+                </Routes>
+              </Suspense>
             </div>
           } />
         </Routes>
