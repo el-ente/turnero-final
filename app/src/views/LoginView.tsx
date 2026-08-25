@@ -44,7 +44,7 @@ export function LoginView() {
           align-items: center;
           justify-content: center;
           padding: 2rem;
-          min-height: calc(100vh - 64px);
+          min-height: 100vh;
           background:
             radial-gradient(ellipse at 30% 20%, rgba(212,96,58,0.06) 0%, transparent 50%),
             radial-gradient(ellipse at 70% 80%, rgba(91,138,94,0.06) 0%, transparent 50%),

@@ -43,6 +43,15 @@ function App() {
           {/* Public display is fullscreen, no auth */}
           <Route path="/display" element={<PublicDisplay />} />
 
+          {/* Mi Turno / Login are public-facing, no staff nav */}
+          <Route path="/mi-turno" element={<WebTicketView />} />
+          <Route path="/mi-turno/:turnId" element={<WebTicketView />} />
+          <Route path="/login" element={
+            <Suspense fallback={<RouteFallback />}>
+              <LoginView />
+            </Suspense>
+          } />
+
           {/* Other views have navbar */}
           <Route path="/*" element={
             <div className="app">
@@ -63,10 +72,6 @@ function App() {
 
               <Suspense fallback={<RouteFallback />}>
                 <Routes>
-                  {/* Mi Turno is the public web channel — take/track a ticket from your own device, no auth */}
-                  <Route path="/mi-turno" element={<WebTicketView />} />
-                  <Route path="/mi-turno/:turnId" element={<WebTicketView />} />
-                  <Route path="/login" element={<LoginView />} />
                   <Route path="/terminal" element={
                     <RequireAuth roles={STAFF_ROLES}><TerminalSelector /></RequireAuth>
                   } />
