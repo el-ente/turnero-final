@@ -46,6 +46,8 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
       - name: Build functions
         run: pnpm -F functions build
+      - name: Test functions
+        run: pnpm -F functions test
       - id: auth
         uses: google-github-actions/auth@v2
         with:

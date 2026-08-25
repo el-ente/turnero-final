@@ -20,6 +20,7 @@
       "predeploy": [
         "pnpm --prefix \"$RESOURCE_DIR\" run lint",
         "pnpm --prefix \"$RESOURCE_DIR\" run build",
+        "pnpm --prefix \"$RESOURCE_DIR\" run test",
         "rm -rf functions/vendor && mkdir -p functions/vendor/shared && cp -r shared/lib shared/package.json functions/vendor/shared/",
         "node functions/scripts/vendor-shared.js file:vendor/shared"
       ],
