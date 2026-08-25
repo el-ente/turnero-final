@@ -26,6 +26,13 @@ export function WebTicketView() {
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string>("");
+  // Separate from `error` (which reports action failures like a failed
+  // cancel) — this flags a dead live-tracking listener, so the visitor
+  // knows the ticket status on screen may no longer be updating.
+  const [listenerErrors, setListenerErrors] = useState<Record<string, boolean>>({});
+  const setListenerError = (key: string, hasError: boolean) =>
+    setListenerErrors((current) => ({ ...current, [key]: hasError }));
+  const hasConnectionError = Object.values(listenerErrors).some(Boolean);
 
   const parsedMemberNumber = Number(memberNumberInput);
   const isValidMemberNumber =
@@ -61,15 +68,23 @@ export function WebTicketView() {
       setNotFound(false);
       return;
     }
-    const unsubscribe = onSnapshot(doc(db, "turns", turnId), (snap) => {
-      if (!snap.exists()) {
-        setNotFound(true);
-        setCurrentTurn(null);
-        return;
+    const unsubscribe = onSnapshot(
+      doc(db, "turns", turnId),
+      (snap) => {
+        setListenerError("turn", false);
+        if (!snap.exists()) {
+          setNotFound(true);
+          setCurrentTurn(null);
+          return;
+        }
+        setNotFound(false);
+        setCurrentTurn({ ...snap.data(), id: snap.id } as Turn);
+      },
+      (error) => {
+        console.error("WebTicketView turn listener:", error);
+        setListenerError("turn", true);
       }
-      setNotFound(false);
-      setCurrentTurn({ ...snap.data(), id: snap.id } as Turn);
-    });
+    );
     return unsubscribe;
   }, [turnId]);
 
@@ -85,12 +100,20 @@ export function WebTicketView() {
       where("queueId", "==", currentTurn.queueId),
       where("status", "==", "waiting")
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ahead = snapshot.docs
-        .map((d) => d.data() as Turn)
-        .filter((t) => toDate(t.queuedAt).getTime() < toDate(currentTurn.queuedAt).getTime()).length;
-      setAheadCount(ahead);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setListenerError("aheadCount", false);
+        const ahead = snapshot.docs
+          .map((d) => d.data() as Turn)
+          .filter((t) => toDate(t.queuedAt).getTime() < toDate(currentTurn.queuedAt).getTime()).length;
+        setAheadCount(ahead);
+      },
+      (error) => {
+        console.error("WebTicketView ahead-count listener:", error);
+        setListenerError("aheadCount", true);
+      }
+    );
     return unsubscribe;
   }, [currentTurn?.queueId, currentTurn?.status, currentTurn?.queuedAt]);
 
@@ -203,6 +226,10 @@ export function WebTicketView() {
               <div className="wt-recall">Rellamado {currentTurn.recallCount}x</div>
             )}
           </div>
+
+          {hasConnectionError && (
+            <p className="wt-connection-notice">No pudimos conectar para actualizar tu turno en vivo. Recargá la página si algo no coincide.</p>
+          )}
 
           {!isEnded && (
             <p className="wt-save-hint">Guardá este enlace para volver a ver tu turno.</p>
@@ -599,6 +626,13 @@ const wtBaseStyles = `
   .wt-save-hint {
     font-size: 0.8rem;
     color: var(--text-light);
+    text-align: center;
+    margin: 0 1.5rem 1rem;
+  }
+
+  .wt-connection-notice {
+    font-size: 0.8rem;
+    color: var(--danger);
     text-align: center;
     margin: 0 1.5rem 1rem;
   }

@@ -34,34 +34,67 @@ export function PublicDisplay() {
   const [sectorNames, setSectorNames] = useState<Record<string, string>>({});
   const [time, setTime] = useState(new Date());
 
+  // Tracks which listeners are currently erroring so the footer indicator
+  // can flip to "connection lost" — this board runs unattended, so a dead
+  // listener with no visible sign could go a full business day unnoticed.
+  const [listenerErrors, setListenerErrors] = useState<Record<string, boolean>>({});
+  const setListenerError = (key: string, hasError: boolean) =>
+    setListenerErrors((current) => ({ ...current, [key]: hasError }));
+
   useEffect(() => {
     const q = query(
       collection(db, "turns"),
       where("status", "in", ["called", "attending"])
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setCalledTurns(snapshot.docs.map((doc) => doc.data() as Turn));
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setListenerError("turns", false);
+        setCalledTurns(snapshot.docs.map((doc) => doc.data() as Turn));
+      },
+      (error) => {
+        console.error("PublicDisplay turns listener:", error);
+        setListenerError("turns", true);
+      }
+    );
     return unsubscribe;
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "terminals"), (snapshot) => {
-      setTerminals(snapshot.docs.map((d) => d.data() as Terminal));
-    });
+    const unsubscribe = onSnapshot(
+      collection(db, "terminals"),
+      (snapshot) => {
+        setListenerError("terminals", false);
+        setTerminals(snapshot.docs.map((d) => d.data() as Terminal));
+      },
+      (error) => {
+        console.error("PublicDisplay terminals listener:", error);
+        setListenerError("terminals", true);
+      }
+    );
     return unsubscribe;
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "sectors"), (snapshot) => {
-      const names: Record<string, string> = {};
-      snapshot.docs.forEach((d) => {
-        names[d.id] = (d.data() as Sector).name;
-      });
-      setSectorNames(names);
-    });
+    const unsubscribe = onSnapshot(
+      collection(db, "sectors"),
+      (snapshot) => {
+        setListenerError("sectors", false);
+        const names: Record<string, string> = {};
+        snapshot.docs.forEach((d) => {
+          names[d.id] = (d.data() as Sector).name;
+        });
+        setSectorNames(names);
+      },
+      (error) => {
+        console.error("PublicDisplay sectors listener:", error);
+        setListenerError("sectors", true);
+      }
+    );
     return unsubscribe;
   }, []);
+
+  const hasConnectionError = Object.values(listenerErrors).some(Boolean);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -183,8 +216,8 @@ export function PublicDisplay() {
       </div>
 
       <div className="display-footer">
-        <span className="footer-dot"></span>
-        <span>En tiempo real</span>
+        <span className={`footer-dot ${hasConnectionError ? "footer-dot-error" : ""}`}></span>
+        <span>{hasConnectionError ? "Conexión inestable — datos pueden estar desactualizados" : "En tiempo real"}</span>
       </div>
 
       <style>{`
@@ -369,6 +402,16 @@ export function PublicDisplay() {
         @keyframes pulse-dot {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
+        }
+
+        .footer-dot-error {
+          background: #D64545;
+          animation: pulse-dot-error 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot-error {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.35; }
         }
 
         @media (max-width: 700px) {

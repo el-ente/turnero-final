@@ -8,14 +8,23 @@ import { useAuth } from "../contexts/useAuth";
 
 export function TerminalSelector() {
   const [allTerminals, setAllTerminals] = useState<Terminal[]>([]);
+  const [connectionError, setConnectionError] = useState(false);
   const navigate = useNavigate();
   const { appUser } = useAuth();
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "terminals"), (snapshot) => {
-      const list = snapshot.docs.map((doc) => doc.data() as Terminal);
-      setAllTerminals(list.sort((a, b) => a.name.localeCompare(b.name)));
-    });
+    const unsubscribe = onSnapshot(
+      collection(db, "terminals"),
+      (snapshot) => {
+        setConnectionError(false);
+        const list = snapshot.docs.map((doc) => doc.data() as Terminal);
+        setAllTerminals(list.sort((a, b) => a.name.localeCompare(b.name)));
+      },
+      (error) => {
+        console.error("TerminalSelector terminals listener:", error);
+        setConnectionError(true);
+      }
+    );
     return unsubscribe;
   }, []);
 
@@ -27,6 +36,10 @@ export function TerminalSelector() {
       <div className="tsel-card">
         <h1 className="tsel-title">Seleccionar Terminal</h1>
         <p className="tsel-subtitle">Elegí tu puesto de atención</p>
+
+        {connectionError && (
+          <div className="tsel-error">No se pudo conectar. La lista de terminales puede estar desactualizada.</div>
+        )}
 
         {terminals.length === 0 ? (
           <div className="tsel-empty">
@@ -147,6 +160,17 @@ export function TerminalSelector() {
           font-size: 0.8rem;
           color: var(--text-muted);
           padding-left: 1rem;
+        }
+
+        .tsel-error {
+          color: var(--danger);
+          background: var(--danger-light);
+          padding: 0.75rem 1rem;
+          border-radius: var(--radius-sm);
+          font-size: 0.85rem;
+          font-weight: 500;
+          margin-bottom: 1.25rem;
+          text-align: center;
         }
 
         .tsel-empty {

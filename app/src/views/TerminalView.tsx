@@ -33,12 +33,27 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
   const [confirmingNoShow, setConfirmingNoShow] = useState(false);
   const { isSupported: pipSupported, pipWindow, openPipWindow } = usePipWindow();
 
+  // Tracks which listeners are currently erroring so the operator sees a
+  // persistent "connection lost" cue instead of silently working off stale
+  // data — the toast below is transient and would auto-hide too soon for this.
+  const [listenerErrors, setListenerErrors] = useState<Record<string, boolean>>({});
+  const setListenerError = (key: string, hasError: boolean) =>
+    setListenerErrors((current) => ({ ...current, [key]: hasError }));
+
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, "terminals", terminalId), (snap) => {
-      if (snap.exists()) {
-        setTerminal(snap.data() as Terminal);
+    const unsubscribe = onSnapshot(
+      doc(db, "terminals", terminalId),
+      (snap) => {
+        setListenerError("terminal", false);
+        if (snap.exists()) {
+          setTerminal(snap.data() as Terminal);
+        }
+      },
+      (error) => {
+        console.error("TerminalView terminal listener:", error);
+        setListenerError("terminal", true);
       }
-    });
+    );
     return unsubscribe;
   }, [terminalId]);
 
@@ -49,12 +64,20 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
       where("queueId", "in", terminal.activeQueueIds),
       where("status", "==", "waiting")
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const turns = snapshot.docs
-        .map((doc) => doc.data() as Turn)
-        .sort((a, b) => toDate(a.queuedAt).getTime() - toDate(b.queuedAt).getTime());
-      setWaitingTurns(turns);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setListenerError("waitingTurns", false);
+        const turns = snapshot.docs
+          .map((doc) => doc.data() as Turn)
+          .sort((a, b) => toDate(a.queuedAt).getTime() - toDate(b.queuedAt).getTime());
+        setWaitingTurns(turns);
+      },
+      (error) => {
+        console.error("TerminalView waiting-turns listener:", error);
+        setListenerError("waitingTurns", true);
+      }
+    );
     return unsubscribe;
   }, [terminal?.activeQueueIds]);
 
@@ -63,15 +86,25 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
       setCurrentTurn(null);
       return;
     }
-    const unsubscribe = onSnapshot(doc(db, "turns", terminal.currentTurnId), (snap) => {
-      if (snap.exists()) {
-        setCurrentTurn(snap.data() as Turn);
-      } else {
-        setCurrentTurn(null);
+    const unsubscribe = onSnapshot(
+      doc(db, "turns", terminal.currentTurnId),
+      (snap) => {
+        setListenerError("currentTurn", false);
+        if (snap.exists()) {
+          setCurrentTurn(snap.data() as Turn);
+        } else {
+          setCurrentTurn(null);
+        }
+      },
+      (error) => {
+        console.error("TerminalView current-turn listener:", error);
+        setListenerError("currentTurn", true);
       }
-    });
+    );
     return unsubscribe;
   }, [terminal?.currentTurnId]);
+
+  const hasConnectionError = Object.values(listenerErrors).some(Boolean);
 
   useEffect(() => {
     setConfirmingNoShow(false);
@@ -210,6 +243,12 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
             {terminal?.status === "offline" ? "Reanudar" : "Pausar"}
           </button>
         </div>
+
+        {hasConnectionError && (
+          <div className="term-connection-warning">
+            Conexión perdida — los datos pueden estar desactualizados
+          </div>
+        )}
 
         {pipSupported && (
           <button
@@ -397,6 +436,16 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
         .term-pause-btn:hover:not(:disabled) {
           border-color: var(--text-light);
           color: var(--text);
+        }
+
+        .term-connection-warning {
+          padding: 0.6rem 0.75rem;
+          background: var(--danger-light);
+          border: 1px solid var(--danger);
+          border-radius: var(--radius-sm);
+          color: var(--danger);
+          font-size: 0.8rem;
+          font-weight: 600;
         }
 
         .term-pip-btn {
