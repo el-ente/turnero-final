@@ -57,6 +57,8 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     return unsubscribe;
   }, [terminalId]);
 
+  const activeQueueIdsKey = terminal?.activeQueueIds.join(",");
+
   useEffect(() => {
     if (!terminal) return;
     const q = query(
@@ -79,7 +81,8 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
       }
     );
     return unsubscribe;
-  }, [terminal?.activeQueueIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeQueueIdsKey]);
 
   useEffect(() => {
     if (!terminal?.currentTurnId) {
