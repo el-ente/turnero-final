@@ -1,4 +1,4 @@
-import {Turn, TurnStatus, Terminal, ServingStrategy, Queue, RatioBasedConfig} from "shared";
+import {Turn, TurnStatus, Terminal, TerminalStatus, ServingStrategy, Queue, RatioBasedConfig} from "shared";
 import {FieldPath} from "firebase-admin/firestore";
 import {db} from "../config/firebase-admin";
 import {NotFoundError, ConflictError} from "../utils/errors";
@@ -31,6 +31,9 @@ export async function getNextTurn(terminalId: string): Promise<Turn | null> {
   }
 
   const terminal = terminalDoc.data() as Terminal;
+  if (terminal.status === TerminalStatus.OFFLINE) {
+    throw new ConflictError(`Terminal ${terminalId} is offline`);
+  }
 
   if (terminal.servingStrategy === ServingStrategy.FIFO_ACROSS_QUEUES) {
     return getNextTurnFifoAcrossQueues(terminal);
@@ -124,6 +127,9 @@ export async function callTurn(terminalId: string, turnId: string): Promise<void
     }
 
     const terminal = terminalDoc.data() as Terminal;
+    if (terminal.status === TerminalStatus.OFFLINE) {
+      throw new ConflictError(`Terminal ${terminalId} is offline`);
+    }
     if (terminal.currentTurnId) {
       throw new ConflictError(
         `Terminal ${terminalId} is already serving turn ${terminal.currentTurnId}`

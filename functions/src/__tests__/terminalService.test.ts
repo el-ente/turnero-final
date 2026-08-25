@@ -49,6 +49,29 @@ describe("Terminal Service", () => {
       expect(getNextTurn("invalid-terminal")).rejects.toThrow();
     });
 
+    it("should throw ConflictError if terminal is offline", async () => {
+      const mockTerminal: Terminal = {
+        id: "terminal-1",
+        name: "Terminal 1",
+        sectorIds: ["sector-1"],
+        activeQueueIds: ["queue-1"],
+        servingStrategy: ServingStrategy.FIFO_ACROSS_QUEUES,
+        strategyConfig: {strategy: ServingStrategy.FIFO_ACROSS_QUEUES},
+        status: "offline",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (db.collection as jest.Mock).mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          get: jest.fn().mockResolvedValue({exists: true, data: () => mockTerminal}),
+        }),
+      });
+
+      await expect(getNextTurn("terminal-1")).rejects.toThrow(ConflictError);
+      expect(getWaitingTurnsAcrossQueues).not.toHaveBeenCalled();
+    });
+
     it("should return null if no waiting turns", async () => {
       const mockTerminal: Terminal = {
         id: "terminal-1",
@@ -356,6 +379,26 @@ describe("Terminal Service", () => {
         .mockResolvedValueOnce({exists: false}); // turn
 
       await expect(callTurn("terminal-1", "invalid-turn")).rejects.toThrow(NotFoundError);
+      expect(transaction.update).not.toHaveBeenCalled();
+    });
+
+    it("should throw ConflictError if terminal is offline, even with no currentTurnId", async () => {
+      mockCollectionDocs();
+      const mockTerminal: Terminal = {
+        id: "terminal-1",
+        name: "Terminal 1",
+        sectorIds: ["sector-1"],
+        activeQueueIds: ["queue-1"],
+        servingStrategy: ServingStrategy.FIFO_ACROSS_QUEUES,
+        strategyConfig: {strategy: ServingStrategy.FIFO_ACROSS_QUEUES},
+        status: "offline",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValueOnce({exists: true, data: () => mockTerminal}); // terminal
+
+      await expect(callTurn("terminal-1", "turn-2")).rejects.toThrow(ConflictError);
       expect(transaction.update).not.toHaveBeenCalled();
     });
 

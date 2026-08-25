@@ -37,7 +37,7 @@ describe("Turn Service", () => {
         if (name === "queues") {
           return {
             doc: jest.fn().mockReturnValue({
-              get: jest.fn().mockResolvedValue({exists: true}),
+              get: jest.fn().mockResolvedValue({exists: true, data: () => ({active: true})}),
             }),
           };
         }
@@ -71,6 +71,27 @@ describe("Turn Service", () => {
       });
 
       expect(createTurn("invalid-queue", 4213)).rejects.toThrow();
+    });
+
+    it("should reject if queue is closed (active === false)", async () => {
+      const setSpy = jest.fn().mockResolvedValue(undefined);
+
+      (db.collection as jest.Mock).mockImplementation((name: string) => {
+        if (name === "queues") {
+          return {
+            doc: jest.fn().mockReturnValue({
+              get: jest.fn().mockResolvedValue({exists: true, data: () => ({active: false})}),
+            }),
+          };
+        }
+        if (name === "turns") {
+          return {doc: jest.fn().mockReturnValue({id: "new-turn-id", set: setSpy})};
+        }
+        throw new Error(`Unexpected collection: ${name}`);
+      });
+
+      await expect(createTurn("queue-1", 4213)).rejects.toThrow("Queue queue-1 is closed");
+      expect(setSpy).not.toHaveBeenCalled();
     });
 
     describe("same-queue duplicate guard", () => {

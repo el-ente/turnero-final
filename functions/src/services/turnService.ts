@@ -12,6 +12,9 @@ export async function createTurn(
   }
   const queueDoc = await db.collection("queues").doc(queueId).get();
   if (!queueDoc.exists) throw new NotFoundError(`Queue ${queueId} not found`);
+  if (queueDoc.data()!.active === false) {
+    throw new ConflictError(`Queue ${queueId} is closed`);
+  }
 
   // Same-queue duplicate guard: a second ticket in the same queue isn't a new
   // need, just a repeat of the same one — keep the existing (older) ticket,
