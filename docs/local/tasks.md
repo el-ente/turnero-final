@@ -173,3 +173,9 @@ Proyecto greenfield. Specs detalladas en `project-specs.md`, codebase casi vací
 ```
 
 Fases 6 y 3 pueden ir en paralelo después de 1. Frontend (7-10) puede empezar después de su backend correspondiente.
+
+---
+
+## Tasks
+
+- [x] ~~Remove the shared navbar from TotemView (`app/src/views/TotemView.tsx`, route `/` in `app/src/App.tsx`). Totem is an unattended public kiosk (like `PublicDisplay` at `/display`) with an idle-reset loop; the navbar exposes staff-only links (Terminal/Admin) and lets customers navigate away from the kiosk flow. Move the `/` route out of the `nav`-wrapped `/*` route, giving it its own layout with no navbar — mirroring how `/display` is already handled. Verify: loading `/` shows no navbar and the number-entry → queue-select → ticket → auto-reset flow still works.~~ → report: totem-navbar-removal-c0f9e19.md
