@@ -4,6 +4,7 @@ import { TotemView } from './views/TotemView'
 import { PublicDisplay } from './views/PublicDisplay'
 import { TerminalView } from './views/TerminalView'
 import { TerminalSelector } from './views/TerminalSelector'
+import { WebTicketView } from './views/WebTicketView'
 import { AdminView } from './views/AdminView'
 import { LoginView } from './views/LoginView'
 import { TicketMark } from './components/TicketMark'
@@ -43,6 +44,7 @@ function App() {
                 </h1>
                 <ul className="nav-links">
                   <li><NavLink to="/" end>Totem</NavLink></li>
+                  <li><NavLink to="/mi-turno">Mi Turno</NavLink></li>
                   <li><NavLink to="/display">Pantalla Pública</NavLink></li>
                   <li><NavLink to="/terminal">Terminal</NavLink></li>
                   <li><NavLink to="/admin">Admin</NavLink></li>
@@ -53,6 +55,9 @@ function App() {
               <Routes>
                 {/* Totem is the public kiosk, no auth */}
                 <Route path="/" element={<TotemView />} />
+                {/* Mi Turno is the public web channel — take/track a ticket from your own device, no auth */}
+                <Route path="/mi-turno" element={<WebTicketView />} />
+                <Route path="/mi-turno/:turnId" element={<WebTicketView />} />
                 <Route path="/login" element={<LoginView />} />
                 <Route path="/terminal" element={
                   <RequireAuth roles={STAFF_ROLES}><TerminalSelector /></RequireAuth>
