@@ -38,3 +38,9 @@ export class ForbiddenError extends BusinessError {
     super("FORBIDDEN", message, 403);
   }
 }
+
+export class TooManyRequestsError extends BusinessError {
+  constructor(message = "Too many requests, please try again shortly") {
+    super("TOO_MANY_REQUESTS", message, 429);
+  }
+}

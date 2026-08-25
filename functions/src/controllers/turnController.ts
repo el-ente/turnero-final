@@ -2,9 +2,12 @@ import {onRequest} from "firebase-functions/v2/https";
 import {createTurn, getCurrentTurn, cancelTurn} from "../services/turnService";
 import {BusinessError} from "../utils/errors";
 import {logger} from "../config/firebase-admin";
+import {checkRateLimit, getClientIp} from "../utils/rateLimit";
 
 export const createTurnHandler = onRequest({cors: true}, async (req, res) => {
   try {
+    await checkRateLimit(getClientIp(req));
+
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
       return;
@@ -31,6 +34,8 @@ export const createTurnHandler = onRequest({cors: true}, async (req, res) => {
 
 export const getCurrentTurnHandler = onRequest({cors: true}, async (req, res) => {
   try {
+    await checkRateLimit(getClientIp(req));
+
     if (req.method !== "GET") {
       res.status(405).json({error: "Method not allowed"});
       return;
@@ -51,13 +56,19 @@ export const getCurrentTurnHandler = onRequest({cors: true}, async (req, res) =>
 
     res.status(200).json(turn);
   } catch (error) {
-    logger.error("Error getting current turn:", error);
-    res.status(500).json({error: "Internal server error"});
+    if (error instanceof BusinessError) {
+      res.status(error.statusCode).json({error: error.message, code: error.code});
+    } else {
+      logger.error("Error getting current turn:", error);
+      res.status(500).json({error: "Internal server error"});
+    }
   }
 });
 
 export const cancelTurnHandler = onRequest({cors: true}, async (req, res) => {
   try {
+    await checkRateLimit(getClientIp(req));
+
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
       return;
