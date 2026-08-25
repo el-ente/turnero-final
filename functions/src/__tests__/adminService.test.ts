@@ -68,6 +68,26 @@ describe("Admin Service", () => {
       await expect(deleteSector("missing-sector")).rejects.toThrow(NotFoundError);
     });
 
+    it("throws ConflictError when any queue in the sector has active turns", async () => {
+      const sectorRef = {get: jest.fn().mockResolvedValue({exists: true})};
+      const queuesSnap = {docs: [{id: "q1", ref: {}}, {id: "q2", ref: {}}]};
+      const activeTurnsGet = jest.fn().mockResolvedValue({empty: false});
+      const turnsWhere = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          limit: jest.fn().mockReturnValue({get: activeTurnsGet}),
+        }),
+      });
+
+      mockCollections({
+        sectors: {doc: jest.fn().mockReturnValue(sectorRef)},
+        queues: {where: jest.fn().mockReturnValue({get: jest.fn().mockResolvedValue(queuesSnap)})},
+        turns: {where: turnsWhere},
+      });
+
+      await expect(deleteSector("sector-1")).rejects.toThrow(ConflictError);
+      expect(turnsWhere).toHaveBeenCalledWith("queueId", "in", ["q1", "q2"]);
+    });
+
     it("batch-deletes queues and updates referencing terminals when the sector has queues", async () => {
       const sectorRef = {get: jest.fn().mockResolvedValue({exists: true})};
       const q1Ref = {id: "q1-ref"};
@@ -98,10 +118,18 @@ describe("Admin Service", () => {
         ],
       };
 
+      const activeTurnsGet = jest.fn().mockResolvedValue({empty: true});
       mockCollections({
         sectors: {doc: jest.fn().mockReturnValue(sectorRef)},
         queues: {where: jest.fn().mockReturnValue({get: jest.fn().mockResolvedValue(queuesSnap)})},
         terminals: {get: jest.fn().mockResolvedValue(terminalsSnap)},
+        turns: {
+          where: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockReturnValue({get: activeTurnsGet}),
+            }),
+          }),
+        },
       });
       const batch = mockBatch();
 

@@ -49,6 +49,18 @@ export async function deleteSector(sectorId: string) {
     .where("sectorId", "==", sectorId).get();
   const queueIds = queuesSnap.docs.map((d) => d.id);
 
+  // Check no active turns in any queue of this sector
+  // (Firestore "in" caps at 30 values, same assumption as queueService.ts)
+  if (queueIds.length > 0) {
+    const activeTurns = await db.collection("turns")
+      .where("queueId", "in", queueIds)
+      .where("status", "in", ["waiting", "called", "attending"])
+      .limit(1).get();
+    if (!activeTurns.empty) {
+      throw new ConflictError("Cannot delete sector with active turns");
+    }
+  }
+
   const batch = db.batch();
 
   // Delete queues
