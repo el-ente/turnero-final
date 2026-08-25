@@ -665,4 +665,14 @@ const wtBaseStyles = `
     width: calc(100% - 3rem);
     margin: 0 1.5rem 1.5rem;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wt-ticket-called {
+      animation: wt-ticket-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .wt-status-called {
+      animation: wt-status-blink 0.6s ease-in-out 1;
+    }
+  }
 `;

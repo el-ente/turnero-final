@@ -817,6 +817,12 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
             font-size: 6rem;
           }
         }
+
+        @media (prefers-reduced-motion: reduce) {
+          .term-id-dot {
+            animation: none;
+          }
+        }
       `}</style>
     </div>
   );

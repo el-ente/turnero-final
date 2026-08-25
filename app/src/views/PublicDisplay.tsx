@@ -421,6 +421,12 @@ export function PublicDisplay() {
           .display-body { padding: 1.5rem; }
           .counter-grid { grid-template-columns: 1fr; gap: 1.25rem; }
         }
+
+        @media (prefers-reduced-motion: reduce) {
+          .footer-dot, .footer-dot-error {
+            animation: none;
+          }
+        }
       `}</style>
     </div>
   );
