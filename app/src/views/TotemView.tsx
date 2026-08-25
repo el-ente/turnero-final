@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import type { Turn, Queue } from "shared";
-import { createTurn, getCurrentTurn, cancelTurn } from "../lib/api";
+import { createTurn } from "../lib/api";
 import { toDate } from "../lib/dates";
 import { db } from "../lib/firebase";
-import { collection, getDocs, query, where, doc, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, query } from "firebase/firestore";
 import { TicketMark } from "../components/TicketMark";
+
+const IDLE_RESET_MS = 25000;
+const CONFIRM_DISPLAY_MS = 5000;
 
 export function TotemView() {
   const [queues, setQueues] = useState<Queue[]>([]);
@@ -14,7 +17,7 @@ export function TotemView() {
   const [currentTurn, setCurrentTurn] = useState<Turn | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
-  const [status, setStatus] = useState<"entering-number" | "selecting-queue" | "viewing">("entering-number");
+  const [status, setStatus] = useState<"entering-number" | "selecting-queue" | "confirmed">("entering-number");
 
   const parsedMemberNumber = Number(memberNumberInput);
   const isValidMemberNumber =
@@ -43,91 +46,41 @@ export function TotemView() {
     loadQueues();
   }, []);
 
-  // Real-time listener on active turn
+  const handleNewTurn = () => {
+    setCurrentTurn(null);
+    setStatus("entering-number");
+    setMemberNumberInput("");
+    setConfirmedMemberNumber(null);
+    setError("");
+  };
+
+  // Auto-dismiss the confirmation screen so the kiosk is free for the next customer
   useEffect(() => {
-    if (!currentTurn?.id) return;
+    if (status !== "confirmed") return;
+    const timer = setTimeout(handleNewTurn, CONFIRM_DISPLAY_MS);
+    return () => clearTimeout(timer);
+  }, [status, currentTurn?.id]);
 
-    const unsubscribe = onSnapshot(doc(db, "turns", currentTurn.id), (snap) => {
-      if (!snap.exists()) return;
-      const turn = { ...snap.data(), id: snap.id } as Turn;
-      setCurrentTurn(turn);
-
-      // Turn ended — allow the next kiosk user in, but they must type their own number
-      if (["finished", "cancelled", "no_show"].includes(turn.status)) {
-        setTimeout(() => {
-          setCurrentTurn(null);
-          setStatus("entering-number");
-          setMemberNumberInput("");
-          setConfirmedMemberNumber(null);
-        }, 5000);
-      }
-    });
-    return unsubscribe;
-  }, [currentTurn?.id]);
-
-  // Live count of waiting turns ahead of this one in the same queue
-  const [aheadCount, setAheadCount] = useState<number | null>(null);
+  // Idle reset — an abandoned interaction shouldn't block the next customer either
   useEffect(() => {
-    if (!currentTurn || currentTurn.status !== "waiting") {
-      setAheadCount(null);
-      return;
-    }
-    const q = query(
-      collection(db, "turns"),
-      where("queueId", "==", currentTurn.queueId),
-      where("status", "==", "waiting")
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ahead = snapshot.docs
-        .map((d) => d.data() as Turn)
-        .filter((t) => toDate(t.queuedAt).getTime() < toDate(currentTurn.queuedAt).getTime()).length;
-      setAheadCount(ahead);
-    });
-    return unsubscribe;
-  }, [currentTurn?.queueId, currentTurn?.status, currentTurn?.queuedAt]);
+    if (status === "confirmed") return;
+    const timer = setTimeout(handleNewTurn, IDLE_RESET_MS);
+    return () => clearTimeout(timer);
+  }, [status, memberNumberInput, selectedQueueId]);
 
   const handleMemberNumberChange = (value: string) => {
     setMemberNumberInput(value.replace(/\D/g, "").slice(0, 5));
   };
 
-  const handleSubmitNumber = async () => {
+  const handleSubmitNumber = () => {
     if (!isValidMemberNumber) return;
-    const memberNumber = parsedMemberNumber;
-    setLoading(true);
-    setError("");
-    try {
-      const turn = await getCurrentTurn(memberNumber);
-      if (turn) {
-        setCurrentTurn(turn);
-        setStatus("viewing");
-      } else {
-        setConfirmedMemberNumber(memberNumber);
-        setStatus("selecting-queue");
-      }
-    } catch {
-      // No active turn found for this member number — go pick a queue
-      setConfirmedMemberNumber(memberNumber);
-      setStatus("selecting-queue");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleBackToEnteringNumber = () => {
-    setStatus("entering-number");
-    setError("");
-  };
-
-  const handleTakeAnotherSection = () => {
-    if (!currentTurn) return;
-    setConfirmedMemberNumber(currentTurn.memberNumber);
-    setSelectedQueueId("");
+    setConfirmedMemberNumber(parsedMemberNumber);
     setStatus("selecting-queue");
     setError("");
   };
 
-  const handleBackToViewing = () => {
-    setStatus("viewing");
+  const handleBackToEnteringNumber = () => {
+    setStatus("entering-number");
     setError("");
   };
 
@@ -141,30 +94,9 @@ export function TotemView() {
     try {
       const turn = await createTurn(selectedQueueId, confirmedMemberNumber, "totem");
       setCurrentTurn(turn);
-      setStatus("viewing");
+      setStatus("confirmed");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear turno");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleNewTurn = () => {
-    setCurrentTurn(null);
-    setStatus("entering-number");
-    setMemberNumberInput("");
-    setConfirmedMemberNumber(null);
-    setError("");
-  };
-
-  const handleCancelTurn = async () => {
-    if (!currentTurn) return;
-    setLoading(true);
-    try {
-      await cancelTurn(currentTurn.id);
-      handleNewTurn();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cancelar turno");
     } finally {
       setLoading(false);
     }
@@ -205,9 +137,9 @@ export function TotemView() {
           <button
             className="totem-submit"
             onClick={handleSubmitNumber}
-            disabled={loading || !isValidMemberNumber}
+            disabled={!isValidMemberNumber}
           >
-            {loading ? "Verificando..." : "Continuar"}
+            Continuar
           </button>
         </div>
 
@@ -219,10 +151,6 @@ export function TotemView() {
   }
 
   if (status === "selecting-queue") {
-    const selectableQueues = currentTurn
-      ? queues.filter((q) => q.id !== currentTurn.queueId)
-      : queues;
-
     return (
       <div className="totem">
         <div className="totem-card">
@@ -234,22 +162,16 @@ export function TotemView() {
 
           <div className="totem-member-confirm">
             <span>Socio N° {confirmedMemberNumber}</span>
-            {currentTurn ? (
-              <button className="totem-change-link" onClick={handleBackToViewing}>
-                volver a mi turno actual
-              </button>
-            ) : (
-              <button className="totem-change-link" onClick={handleBackToEnteringNumber}>
-                cambiar
-              </button>
-            )}
+            <button className="totem-change-link" onClick={handleBackToEnteringNumber}>
+              cambiar
+            </button>
           </div>
 
-          {selectableQueues.length === 0 ? (
+          {queues.length === 0 ? (
             <div className="totem-empty">No hay colas disponibles</div>
           ) : (
             <div className="queue-options">
-              {selectableQueues.map((queue) => (
+              {queues.map((queue) => (
                 <button
                   key={queue.id}
                   className={`queue-option ${selectedQueueId === queue.id ? "selected" : ""}`}
@@ -262,7 +184,7 @@ export function TotemView() {
             </div>
           )}
 
-          {selectableQueues.find((q) => q.id === selectedQueueId)?.type === "priority" && (
+          {queues.find((q) => q.id === selectedQueueId)?.type === "priority" && (
             <p className="totem-priority-note">
               Para personas mayores, embarazadas o con discapacidad.
             </p>
@@ -285,20 +207,12 @@ export function TotemView() {
     );
   }
 
-  if (status === "viewing" && currentTurn) {
+  if (status === "confirmed" && currentTurn) {
     const queue = queues.find((q) => q.id === currentTurn.queueId);
-    const isCalled = currentTurn.status === "called";
-    const isEnded = ["finished", "cancelled", "no_show"].includes(currentTurn.status);
 
     return (
       <div className="totem">
-        <div className={`ticket-card ${isCalled ? "ticket-called" : ""}`}>
-          {currentTurn.status === "waiting" && (
-            <button className="ticket-not-you" onClick={handleNewTurn}>
-              ¿No sos vos? Sacar mi turno
-            </button>
-          )}
-
+        <div className="ticket-card">
           <div className="ticket-top">
             <span className="ticket-label">Tu turno</span>
             <div className="ticket-number">{currentTurn.memberNumber}</div>
@@ -312,47 +226,12 @@ export function TotemView() {
           </div>
 
           <div className="ticket-bottom">
-            <div className={`ticket-status ${isCalled ? "ticket-status-called" : ""}`}>
-              {currentTurn.status === "waiting" && "Esperando..."}
-              {currentTurn.status === "called" && "¡Te están llamando!"}
-              {currentTurn.status === "attending" && "En atención"}
-              {currentTurn.status === "finished" && "Finalizado"}
-              {currentTurn.status === "cancelled" && "Cancelado"}
-              {currentTurn.status === "no_show" && "No presentado"}
-            </div>
-            {currentTurn.terminalId && isCalled && (
-              <div className="ticket-terminal">Dirigite al terminal</div>
-            )}
-            {currentTurn.status === "waiting" && aheadCount !== null && (
-              <div className="ticket-position">
-                {aheadCount === 0 ? "Sos el próximo" : `${aheadCount} persona${aheadCount !== 1 ? "s" : ""} por delante tuyo`}
-              </div>
-            )}
+            <div className="ticket-status">Ticket listo</div>
+            <div className="ticket-hint">Mirá el panel para seguir tu turno</div>
             <div className="ticket-time">
               {toDate(currentTurn.createdAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
             </div>
-            {currentTurn.recallCount > 0 && (
-              <div className="ticket-recall">Rellamado {currentTurn.recallCount}x</div>
-            )}
           </div>
-
-          {!isEnded && (
-            <button className="ticket-another-section" onClick={handleTakeAnotherSection}>
-              Sacar turno en otra sección
-            </button>
-          )}
-
-          {currentTurn.status === "waiting" && (
-            <button className="ticket-cancel" onClick={handleCancelTurn} disabled={loading}>
-              {loading ? "Cancelando..." : "Cancelar turno"}
-            </button>
-          )}
-
-          {isEnded && (
-            <button className="totem-submit" onClick={handleNewTurn}>
-              Sacar otro turno
-            </button>
-          )}
         </div>
 
         <style>{totemBaseStyles}</style>
@@ -594,39 +473,9 @@ const ticketStyles = `
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
   }
 
-  .ticket-not-you {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    background: none;
-    border: none;
-    color: var(--text-light);
-    font-family: var(--font-body);
-    font-size: 0.75rem;
-    text-decoration: underline;
-    cursor: pointer;
-    padding: 0.25rem;
-    z-index: 1;
-  }
-
-  .ticket-not-you:hover {
-    color: var(--text-muted);
-  }
-
-  .ticket-called {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(212,96,58,0.15), var(--shadow-lg);
-    animation: ticket-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), ticket-pulse 1.5s ease-in-out infinite;
-  }
-
   @keyframes ticket-in {
     from { opacity: 0; transform: scale(0.9) translateY(20px); }
     to { opacity: 1; transform: scale(1) translateY(0); }
-  }
-
-  @keyframes ticket-pulse {
-    0%, 100% { box-shadow: 0 0 0 3px rgba(212,96,58,0.15), var(--shadow-lg); }
-    50% { box-shadow: 0 0 0 6px rgba(212,96,58,0.25), var(--shadow-lg); }
   }
 
   .ticket-top {
@@ -699,98 +548,15 @@ const ticketStyles = `
     margin-bottom: 0.25rem;
   }
 
-  .ticket-status-called {
-    color: var(--primary);
-    font-size: 1.3rem;
-    animation: status-blink 1s ease-in-out infinite;
-  }
-
-  @keyframes status-blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-  }
-
-  .ticket-terminal {
+  .ticket-hint {
     font-size: 0.9rem;
     font-weight: 500;
     color: var(--text-muted);
-    margin-bottom: 0.25rem;
-  }
-
-  .ticket-position {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--secondary);
-    margin-bottom: 0.25rem;
-  }
-
-  .ticket-another-section {
-    display: block;
-    width: calc(100% - 3rem);
-    margin: 0 1.5rem 0.75rem;
-    padding: 0.7rem;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text);
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .ticket-another-section:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: var(--primary-light);
-  }
-
-  .ticket-cancel {
-    display: block;
-    width: calc(100% - 3rem);
-    margin: 0 1.5rem 1.5rem;
-    padding: 0.7rem;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text-muted);
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .ticket-cancel:hover:not(:disabled) {
-    border-color: var(--danger);
-    color: var(--danger);
-    background: var(--danger-light);
-  }
-
-  .ticket-cancel:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    margin-bottom: 0.75rem;
   }
 
   .ticket-time {
     font-size: 0.85rem;
     color: var(--text-light);
-  }
-
-  .ticket-recall {
-    display: inline-block;
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--accent);
-    background: var(--accent-light);
-    padding: 0.2rem 0.5rem;
-    border-radius: 999px;
-  }
-
-  .totem-submit {
-    width: calc(100% - 3rem);
-    margin: 0 1.5rem 1.5rem;
   }
 `;
