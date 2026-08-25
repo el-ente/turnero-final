@@ -240,7 +240,7 @@ export function PublicDisplay() {
           flex: 1;
           display: flex;
           padding: 3rem;
-          overflow: hidden;
+          overflow-y: auto;
         }
 
         .display-empty {
@@ -328,8 +328,8 @@ export function PublicDisplay() {
         }
 
         .counter-recall-badge {
-          display: inline-block;
-          margin-top: 0.6rem;
+          display: table;
+          margin: 0.6rem auto 0;
           font-size: 0.7rem;
           font-weight: 700;
           color: #E9A84C;
@@ -372,6 +372,9 @@ export function PublicDisplay() {
         }
 
         @media (max-width: 700px) {
+          .display-header { padding: 1rem 1.25rem; }
+          .brand-name { font-size: 1.05rem; }
+          .display-clock { font-size: 1.1rem; letter-spacing: 0.02em; }
           .display-body { padding: 1.5rem; }
           .counter-grid { grid-template-columns: 1fr; gap: 1.25rem; }
         }
