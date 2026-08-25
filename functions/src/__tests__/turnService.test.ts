@@ -125,14 +125,14 @@ describe("Turn Service", () => {
   });
 
   describe("cancelTurn", () => {
-    it("cancels a waiting turn", async () => {
+    it("cancels a waiting turn when memberNumber matches", async () => {
       const transaction = mockRunTransaction();
       transaction.get.mockResolvedValue({
         exists: true,
-        data: () => ({status: TurnStatus.WAITING}),
+        data: () => ({status: TurnStatus.WAITING, memberNumber: 4213}),
       });
 
-      await cancelTurn("turn-1");
+      await cancelTurn("turn-1", 4213);
 
       expect(transaction.update).toHaveBeenCalledWith(
         expect.anything(),
@@ -144,17 +144,28 @@ describe("Turn Service", () => {
       const transaction = mockRunTransaction();
       transaction.get.mockResolvedValue({exists: false});
 
-      await expect(cancelTurn("invalid-turn")).rejects.toThrow();
+      await expect(cancelTurn("invalid-turn", 4213)).rejects.toThrow();
     });
 
     it("throws ConflictError if turn is not WAITING", async () => {
       const transaction = mockRunTransaction();
       transaction.get.mockResolvedValue({
         exists: true,
-        data: () => ({status: TurnStatus.CALLED}),
+        data: () => ({status: TurnStatus.CALLED, memberNumber: 4213}),
       });
 
-      await expect(cancelTurn("turn-1")).rejects.toThrow();
+      await expect(cancelTurn("turn-1", 4213)).rejects.toThrow();
+      expect(transaction.update).not.toHaveBeenCalled();
+    });
+
+    it("throws ForbiddenError and does not cancel if memberNumber does not match", async () => {
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValue({
+        exists: true,
+        data: () => ({status: TurnStatus.WAITING, memberNumber: 4213}),
+      });
+
+      await expect(cancelTurn("turn-1", 9999)).rejects.toThrow();
       expect(transaction.update).not.toHaveBeenCalled();
     });
   });

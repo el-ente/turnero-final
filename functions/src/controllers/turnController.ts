@@ -63,14 +63,14 @@ export const cancelTurnHandler = onRequest({cors: true}, async (req, res) => {
       return;
     }
 
-    const {turnId} = req.body;
+    const {turnId, memberNumber} = req.body;
 
-    if (!turnId) {
-      res.status(400).json({error: "turnId is required"});
+    if (!turnId || !memberNumber) {
+      res.status(400).json({error: "turnId and memberNumber are required"});
       return;
     }
 
-    await cancelTurn(turnId);
+    await cancelTurn(turnId, memberNumber);
     res.status(200).json({success: true});
   } catch (error) {
     if (error instanceof BusinessError) {

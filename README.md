@@ -126,7 +126,7 @@ El filtro de sector es la respuesta a "no quiero que cualquier cajero pueda eleg
 
 ### Turn Management
 
-Sin auth — Totem es un kiosco público y `cancelTurn` es autoservicio del cliente sobre su propio turno.
+Sin auth — Totem es un kiosco público y `cancelTurn` es autoservicio del cliente sobre su propio turno. Como no hay auth, `cancelTurn` exige `memberNumber` en el body y verifica que coincida con el `memberNumber` del turno (si no coincide, `403`) — así conocer/filtrarse un `turnId` (URL `/mi-turno/:turnId`, historial del navegador, etc.) no alcanza para cancelar el turno de otra persona.
 
 El **número de ticket es el número de socio** (`memberNumber`, entero de 1 a 99999) que el cliente ingresa en el Totem — no es un contador secuencial diario. Es externo y no se valida contra ningún padrón; la app solo verifica el rango.
 
@@ -143,7 +143,7 @@ GET /getCurrentTurn?memberNumber=12345
 
 ```bash
 POST /cancelTurn
-  { turnId }
+  { turnId, memberNumber }
   → { success: true }
 ```
 

@@ -132,7 +132,7 @@ export function WebTicketView() {
     setCancelling(true);
     setError("");
     try {
-      await cancelTurn(currentTurn.id);
+      await cancelTurn(currentTurn.id, currentTurn.memberNumber);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cancelar turno");
     } finally {

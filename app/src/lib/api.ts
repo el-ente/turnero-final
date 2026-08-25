@@ -77,8 +77,8 @@ export async function getCurrentTurn(memberNumber: number): Promise<Turn> {
   return callFunction<Turn>("getCurrentTurn", "GET", undefined, { memberNumber: String(memberNumber) });
 }
 
-export async function cancelTurn(turnId: string): Promise<void> {
-  return callFunction<void>("cancelTurn", "POST", { turnId });
+export async function cancelTurn(turnId: string, memberNumber: number): Promise<void> {
+  return callFunction<void>("cancelTurn", "POST", { turnId, memberNumber });
 }
 
 // Terminal API

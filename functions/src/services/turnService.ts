@@ -1,6 +1,6 @@
 import {Turn, TurnStatus, Channel} from "shared";
 import {db} from "../config/firebase-admin";
-import {NotFoundError, ConflictError, ValidationError} from "../utils/errors";
+import {NotFoundError, ConflictError, ValidationError, ForbiddenError} from "../utils/errors";
 
 export async function createTurn(
   queueId: string,
@@ -60,7 +60,11 @@ export async function getTurnById(turnId: string): Promise<Turn | null> {
   return turnDoc.data() as Turn;
 }
 
-export async function cancelTurn(turnId: string): Promise<void> {
+export async function cancelTurn(turnId: string, memberNumber: number): Promise<void> {
+  if (!Number.isInteger(memberNumber)) {
+    throw new ValidationError("memberNumber must be an integer");
+  }
+
   // Transactional so a customer's cancel and an operator's simultaneous
   // callTurn can't race — whichever commits first is the one that sticks,
   // and the loser sees the fresh status and errors instead of overwriting it.
@@ -72,6 +76,9 @@ export async function cancelTurn(turnId: string): Promise<void> {
     }
 
     const turn = turnDoc.data() as Turn;
+    if (turn.memberNumber !== memberNumber) {
+      throw new ForbiddenError("memberNumber does not match this turn");
+    }
     if (turn.status !== TurnStatus.WAITING) {
       throw new ConflictError(`Turn is not in WAITING status (current: ${turn.status})`);
     }
