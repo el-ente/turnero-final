@@ -123,6 +123,13 @@ export async function callTurn(terminalId: string, turnId: string): Promise<void
       throw new NotFoundError(`Terminal ${terminalId} not found`);
     }
 
+    const terminal = terminalDoc.data() as Terminal;
+    if (terminal.currentTurnId) {
+      throw new ConflictError(
+        `Terminal ${terminalId} is already serving turn ${terminal.currentTurnId}`
+      );
+    }
+
     const turnDoc = await transaction.get(turnRef);
     if (!turnDoc.exists) {
       throw new NotFoundError(`Turn ${turnId} not found`);
@@ -142,7 +149,6 @@ export async function callTurn(terminalId: string, turnId: string): Promise<void
       terminalId,
     });
 
-    const terminal = terminalDoc.data() as Terminal;
     const terminalUpdate: Record<string, unknown> = {currentTurnId: turnId};
 
     if (terminal.servingStrategy === ServingStrategy.RATIO_BASED && terminal.strategyConfig.ratioBased) {

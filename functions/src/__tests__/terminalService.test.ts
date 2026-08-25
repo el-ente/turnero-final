@@ -352,10 +352,31 @@ describe("Terminal Service", () => {
       mockCollectionDocs();
       const transaction = mockRunTransaction();
       transaction.get
-        .mockResolvedValueOnce({exists: true}) // terminal
+        .mockResolvedValueOnce({exists: true, data: () => ({})}) // terminal
         .mockResolvedValueOnce({exists: false}); // turn
 
       await expect(callTurn("terminal-1", "invalid-turn")).rejects.toThrow(NotFoundError);
+      expect(transaction.update).not.toHaveBeenCalled();
+    });
+
+    it("should throw ConflictError if terminal already has an active currentTurnId", async () => {
+      mockCollectionDocs();
+      const mockTerminal: Terminal = {
+        id: "terminal-1",
+        name: "Terminal 1",
+        sectorIds: ["sector-1"],
+        activeQueueIds: ["queue-1"],
+        servingStrategy: ServingStrategy.FIFO_ACROSS_QUEUES,
+        strategyConfig: {strategy: ServingStrategy.FIFO_ACROSS_QUEUES},
+        status: "available",
+        currentTurnId: "turn-in-progress",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValueOnce({exists: true, data: () => mockTerminal}); // terminal
+
+      await expect(callTurn("terminal-1", "turn-2")).rejects.toThrow(ConflictError);
       expect(transaction.update).not.toHaveBeenCalled();
     });
 
@@ -373,7 +394,7 @@ describe("Terminal Service", () => {
       };
       const transaction = mockRunTransaction();
       transaction.get
-        .mockResolvedValueOnce({exists: true}) // terminal
+        .mockResolvedValueOnce({exists: true, data: () => ({})}) // terminal
         .mockResolvedValueOnce({exists: true, data: () => mockTurn}); // turn
 
       await expect(callTurn("terminal-1", "turn-1")).rejects.toThrow(ConflictError);
