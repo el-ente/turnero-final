@@ -312,9 +312,12 @@ describe("Admin Service", () => {
   });
 
   describe("deleteTerminal", () => {
-    it("throws ConflictError when the terminal is busy", async () => {
+    it("throws ConflictError when the terminal has a currentTurnId", async () => {
       const terminalRef = {
-        get: jest.fn().mockResolvedValue({exists: true, data: () => ({status: "busy", activeQueueIds: []})}),
+        get: jest.fn().mockResolvedValue({
+          exists: true,
+          data: () => ({status: "available", currentTurnId: "turn-1", activeQueueIds: []}),
+        }),
         delete: jest.fn(),
       };
       mockCollections({
@@ -325,7 +328,7 @@ describe("Admin Service", () => {
       expect(terminalRef.delete).not.toHaveBeenCalled();
     });
 
-    it("clears servedBy on previously-served queues for a non-busy terminal", async () => {
+    it("clears servedBy on previously-served queues for a terminal with no currentTurnId", async () => {
       const terminalRef = {
         get: jest.fn().mockResolvedValue({
           exists: true,

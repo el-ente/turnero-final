@@ -259,7 +259,7 @@ export async function deleteTerminal(terminalId: string) {
   if (!doc.exists) throw new NotFoundError("Terminal not found");
 
   const data = doc.data()!;
-  if (data.status === "busy") {
+  if (data.currentTurnId) {
     throw new ConflictError("Cannot delete busy terminal");
   }
 
