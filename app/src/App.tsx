@@ -37,6 +37,9 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          {/* Totem is the unattended public kiosk, fullscreen, no auth, no navbar */}
+          <Route path="/" element={<TotemView />} />
+
           {/* Public display is fullscreen, no auth */}
           <Route path="/display" element={<PublicDisplay />} />
 
@@ -60,8 +63,6 @@ function App() {
 
               <Suspense fallback={<RouteFallback />}>
                 <Routes>
-                  {/* Totem is the public kiosk, no auth */}
-                  <Route path="/" element={<TotemView />} />
                   {/* Mi Turno is the public web channel — take/track a ticket from your own device, no auth */}
                   <Route path="/mi-turno" element={<WebTicketView />} />
                   <Route path="/mi-turno/:turnId" element={<WebTicketView />} />
