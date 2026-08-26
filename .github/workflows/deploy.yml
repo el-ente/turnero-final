@@ -2,6 +2,7 @@ name: Deploy
 on:
   push:
     branches: [develop, qa, main]
+  workflow_dispatch:
 jobs:
   resolve-env:
     runs-on: ubuntu-latest
