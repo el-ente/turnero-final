@@ -2,7 +2,8 @@
   "indexes": [
     {
       "collectionGroup": "turns",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
+      "apiScope": "DATASTORE_MODE_API",
       "fields": [
         { "fieldPath": "memberNumber", "order": "ASCENDING" },
         { "fieldPath": "queueId", "order": "ASCENDING" },
@@ -11,7 +12,8 @@
     },
     {
       "collectionGroup": "turns",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
+      "apiScope": "DATASTORE_MODE_API",
       "fields": [
         { "fieldPath": "memberNumber", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
@@ -20,7 +22,8 @@
     },
     {
       "collectionGroup": "turns",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
+      "apiScope": "DATASTORE_MODE_API",
       "fields": [
         { "fieldPath": "queueId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
@@ -29,7 +32,8 @@
     },
     {
       "collectionGroup": "turns",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
+      "apiScope": "DATASTORE_MODE_API",
       "fields": [
         { "fieldPath": "queueId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "ASCENDING" }
@@ -37,7 +41,8 @@
     },
     {
       "collectionGroup": "turns",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
+      "apiScope": "DATASTORE_MODE_API",
       "fields": [
         { "fieldPath": "queueId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
