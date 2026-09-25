@@ -4,7 +4,7 @@ import {BusinessError} from "../utils/errors";
 import {logger} from "../config/firebase-admin";
 import {checkRateLimit, getClientIp} from "../utils/rateLimit";
 
-export const createTurnHandler = onRequest({cors: true}, async (req, res) => {
+export const createTurnHandler = onRequest({cors: true, invoker: "public"}, async (req, res) => {
   try {
     await checkRateLimit(getClientIp(req));
 
@@ -32,7 +32,7 @@ export const createTurnHandler = onRequest({cors: true}, async (req, res) => {
   }
 });
 
-export const getCurrentTurnHandler = onRequest({cors: true}, async (req, res) => {
+export const getCurrentTurnHandler = onRequest({cors: true, invoker: "public"}, async (req, res) => {
   try {
     await checkRateLimit(getClientIp(req));
 
@@ -65,7 +65,7 @@ export const getCurrentTurnHandler = onRequest({cors: true}, async (req, res) =>
   }
 });
 
-export const cancelTurnHandler = onRequest({cors: true}, async (req, res) => {
+export const cancelTurnHandler = onRequest({cors: true, invoker: "public"}, async (req, res) => {
   try {
     await checkRateLimit(getClientIp(req));
 

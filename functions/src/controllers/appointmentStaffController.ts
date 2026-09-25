@@ -10,7 +10,7 @@ import {requireRole} from "../middleware/auth";
 
 const STAFF_ROLES = [UserRole.CASHIER, UserRole.SUPERVISOR, UserRole.ADMIN];
 
-export const callAppointmentHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res) => {
+export const callAppointmentHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -35,7 +35,7 @@ export const callAppointmentHandler = onRequest({cors: true}, requireRole(STAFF_
   }
 }));
 
-export const recallAppointmentHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res) => {
+export const recallAppointmentHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -60,7 +60,7 @@ export const recallAppointmentHandler = onRequest({cors: true}, requireRole(STAF
   }
 }));
 
-export const startAppointmentHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res) => {
+export const startAppointmentHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -85,7 +85,7 @@ export const startAppointmentHandler = onRequest({cors: true}, requireRole(STAFF
   }
 }));
 
-export const finishAppointmentHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res) => {
+export const finishAppointmentHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -110,7 +110,7 @@ export const finishAppointmentHandler = onRequest({cors: true}, requireRole(STAF
   }
 }));
 
-export const noShowAppointmentHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res) => {
+export const noShowAppointmentHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -135,7 +135,7 @@ export const noShowAppointmentHandler = onRequest({cors: true}, requireRole(STAF
   }
 }));
 
-export const getAppointmentsByDateHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res) => {
+export const getAppointmentsByDateHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res) => {
   try {
     if (req.method !== "GET") {
       res.status(405).json({error: "Method not allowed"});

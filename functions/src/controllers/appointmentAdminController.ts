@@ -19,7 +19,7 @@ function handleError(res: any, error: unknown) {
 
 // ─── Appointment Services ───
 
-export const createAppointmentServiceHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const createAppointmentServiceHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -31,7 +31,7 @@ export const createAppointmentServiceHandler = onRequest({cors: true}, requireRo
   }
 }));
 
-export const listAppointmentServicesHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const listAppointmentServicesHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "GET") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -43,7 +43,7 @@ export const listAppointmentServicesHandler = onRequest({cors: true}, requireRol
   }
 }));
 
-export const updateAppointmentServiceHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const updateAppointmentServiceHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "PUT") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -61,7 +61,7 @@ export const updateAppointmentServiceHandler = onRequest({cors: true}, requireRo
 
 // ─── Appointment Blocks ───
 
-export const createAppointmentBlockHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const createAppointmentBlockHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -73,7 +73,7 @@ export const createAppointmentBlockHandler = onRequest({cors: true}, requireRole
   }
 }));
 
-export const listAppointmentBlocksHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const listAppointmentBlocksHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "GET") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -85,7 +85,7 @@ export const listAppointmentBlocksHandler = onRequest({cors: true}, requireRole(
   }
 }));
 
-export const deleteAppointmentBlockHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const deleteAppointmentBlockHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "DELETE") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -101,7 +101,7 @@ export const deleteAppointmentBlockHandler = onRequest({cors: true}, requireRole
   }
 }));
 
-export const previewAppointmentBlockImpactHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const previewAppointmentBlockImpactHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "GET") {
       res.status(405).json({error: "Method not allowed"}); return;

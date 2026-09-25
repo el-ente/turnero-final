@@ -21,7 +21,7 @@ function handleError(res: any, error: unknown) {
 
 // ─── Stats (existing) ───
 
-export const getQueueStatsHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN, UserRole.SUPERVISOR], async (req, res) => {
+export const getQueueStatsHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN, UserRole.SUPERVISOR], async (req, res) => {
   try {
     if (req.method !== "GET") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -39,7 +39,7 @@ export const getQueueStatsHandler = onRequest({cors: true}, requireRole([UserRol
 
 // ─── Sectors ───
 
-export const createSectorHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const createSectorHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -51,7 +51,7 @@ export const createSectorHandler = onRequest({cors: true}, requireRole([UserRole
   }
 }));
 
-export const listSectorsHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const listSectorsHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "GET") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -63,7 +63,7 @@ export const listSectorsHandler = onRequest({cors: true}, requireRole([UserRole.
   }
 }));
 
-export const updateSectorHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const updateSectorHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "PUT") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -79,7 +79,7 @@ export const updateSectorHandler = onRequest({cors: true}, requireRole([UserRole
   }
 }));
 
-export const deleteSectorHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const deleteSectorHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "DELETE") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -97,7 +97,7 @@ export const deleteSectorHandler = onRequest({cors: true}, requireRole([UserRole
 
 // ─── Queues ───
 
-export const createQueueHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const createQueueHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -109,7 +109,7 @@ export const createQueueHandler = onRequest({cors: true}, requireRole([UserRole.
   }
 }));
 
-export const listQueuesHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const listQueuesHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "GET") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -121,7 +121,7 @@ export const listQueuesHandler = onRequest({cors: true}, requireRole([UserRole.A
   }
 }));
 
-export const updateQueueHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const updateQueueHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "PUT") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -137,7 +137,7 @@ export const updateQueueHandler = onRequest({cors: true}, requireRole([UserRole.
   }
 }));
 
-export const deleteQueueHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const deleteQueueHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "DELETE") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -155,7 +155,7 @@ export const deleteQueueHandler = onRequest({cors: true}, requireRole([UserRole.
 
 // ─── Terminals ───
 
-export const createTerminalHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const createTerminalHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -167,7 +167,7 @@ export const createTerminalHandler = onRequest({cors: true}, requireRole([UserRo
   }
 }));
 
-export const listTerminalsHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const listTerminalsHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "GET") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -179,7 +179,7 @@ export const listTerminalsHandler = onRequest({cors: true}, requireRole([UserRol
   }
 }));
 
-export const updateTerminalHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const updateTerminalHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "PUT") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -195,7 +195,7 @@ export const updateTerminalHandler = onRequest({cors: true}, requireRole([UserRo
   }
 }));
 
-export const deleteTerminalHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const deleteTerminalHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   try {
     if (req.method !== "DELETE") {
       res.status(405).json({error: "Method not allowed"}); return;

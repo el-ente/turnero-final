@@ -6,7 +6,7 @@ import {BusinessError} from "../utils/errors";
 import {logger} from "../config/firebase-admin";
 import {checkRateLimit, getClientIp} from "../utils/rateLimit";
 
-export const createAppointmentHandler = onRequest({cors: true}, async (req, res) => {
+export const createAppointmentHandler = onRequest({cors: true, invoker: "public"}, async (req, res) => {
   try {
     await checkRateLimit(getClientIp(req));
 
@@ -36,7 +36,7 @@ export const createAppointmentHandler = onRequest({cors: true}, async (req, res)
   }
 });
 
-export const getAvailableSlotsHandler = onRequest({cors: true}, async (req, res) => {
+export const getAvailableSlotsHandler = onRequest({cors: true, invoker: "public"}, async (req, res) => {
   try {
     await checkRateLimit(getClientIp(req));
 
@@ -64,7 +64,7 @@ export const getAvailableSlotsHandler = onRequest({cors: true}, async (req, res)
   }
 });
 
-export const getAppointmentHandler = onRequest({cors: true}, async (req, res) => {
+export const getAppointmentHandler = onRequest({cors: true, invoker: "public"}, async (req, res) => {
   try {
     await checkRateLimit(getClientIp(req));
 
@@ -93,7 +93,7 @@ export const getAppointmentHandler = onRequest({cors: true}, async (req, res) =>
   }
 });
 
-export const cancelAppointmentHandler = onRequest({cors: true}, async (req, res) => {
+export const cancelAppointmentHandler = onRequest({cors: true, invoker: "public"}, async (req, res) => {
   try {
     await checkRateLimit(getClientIp(req));
 
@@ -122,7 +122,7 @@ export const cancelAppointmentHandler = onRequest({cors: true}, async (req, res)
   }
 });
 
-export const rescheduleAppointmentHandler = onRequest({cors: true}, async (req, res) => {
+export const rescheduleAppointmentHandler = onRequest({cors: true, invoker: "public"}, async (req, res) => {
   try {
     await checkRateLimit(getClientIp(req));
 

@@ -17,7 +17,7 @@ function handleError(res: any, error: unknown) {
 // Called by the frontend right after a successful Google Sign-In. Not
 // wrapped in requireRole since the users/{uid} doc this creates doesn't
 // exist yet on a person's very first login.
-export const bootstrapUserHandler = onRequest({cors: true}, async (req, res) => {
+export const bootstrapUserHandler = onRequest({cors: true, invoker: "public"}, async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"}); return;
@@ -34,7 +34,7 @@ export const bootstrapUserHandler = onRequest({cors: true}, async (req, res) => 
   }
 });
 
-export const listUsersHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const listUsersHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   if (req.method !== "GET") {
     res.status(405).json({error: "Method not allowed"}); return;
   }
@@ -46,7 +46,7 @@ export const listUsersHandler = onRequest({cors: true}, requireRole([UserRole.AD
   }
 }));
 
-export const inviteUserHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const inviteUserHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).json({error: "Method not allowed"}); return;
   }
@@ -59,7 +59,7 @@ export const inviteUserHandler = onRequest({cors: true}, requireRole([UserRole.A
   }
 }));
 
-export const updateUserRoleHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const updateUserRoleHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   if (req.method !== "PUT") {
     res.status(405).json({error: "Method not allowed"}); return;
   }
@@ -76,7 +76,7 @@ export const updateUserRoleHandler = onRequest({cors: true}, requireRole([UserRo
   }
 }));
 
-export const deleteUserHandler = onRequest({cors: true}, requireRole([UserRole.ADMIN], async (req, res) => {
+export const deleteUserHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN], async (req, res) => {
   if (req.method !== "DELETE") {
     res.status(405).json({error: "Method not allowed"}); return;
   }

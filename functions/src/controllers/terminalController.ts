@@ -22,7 +22,7 @@ async function assertTerminalAccess(user: AppUser, terminalId: string) {
   }
 }
 
-export const nextTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
+export const nextTurnHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -54,7 +54,7 @@ export const nextTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, 
   }
 }));
 
-export const callTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
+export const callTurnHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -81,7 +81,7 @@ export const callTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, 
   }
 }));
 
-export const startTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
+export const startTurnHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -108,7 +108,7 @@ export const startTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES,
   }
 }));
 
-export const finishTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
+export const finishTurnHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -135,7 +135,7 @@ export const finishTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES
   }
 }));
 
-export const recallTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
+export const recallTurnHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -162,7 +162,7 @@ export const recallTurnHandler = onRequest({cors: true}, requireRole(STAFF_ROLES
   }
 }));
 
-export const noShowHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
+export const noShowHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
@@ -193,7 +193,7 @@ export const noShowHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, as
 // serves, without going through Admin. Only allowed while the terminal isn't
 // mid-turn (see reassignTerminalQueues) — the button that drives this is
 // disabled client-side too, but the check has to hold server-side regardless.
-export const reassignTerminalQueuesHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
+export const reassignTerminalQueuesHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res, user) => {
   try {
     if (req.method !== "POST") {
       res.status(405).json({error: "Method not allowed"});
