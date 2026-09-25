@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { Sector, Queue, Terminal, AppUser } from "shared";
+import type { Sector, Queue, Terminal, AppUser, AppointmentService, AppointmentBlock, AvailabilityRule } from "shared";
 import { UserRole, UserStatus } from "shared";
 import { AdminModal } from "../components/AdminModal";
 import {
@@ -8,7 +8,12 @@ import {
   apiListQueues, apiCreateQueue, apiUpdateQueue, apiDeleteQueue,
   apiListTerminals, apiCreateTerminal, apiUpdateTerminal, apiDeleteTerminal,
   apiListUsers, apiInviteUser, apiUpdateUserRole, apiDeleteUser,
+  apiListAppointmentServices, apiCreateAppointmentService, apiUpdateAppointmentService,
+  apiListAppointmentBlocks, apiCreateAppointmentBlock, apiDeleteAppointmentBlock,
+  apiPreviewAppointmentBlockImpact,
 } from "../lib/api";
+
+const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 const ROLE_LABELS: Record<string, string> = {
   [UserRole.ADMIN]: "Admin",
@@ -17,6 +22,13 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const QUEUE_TYPE_LABELS: Record<string, string> = { normal: "Normal", priority: "Prioritaria" };
+
+function formatAvailabilityRules(rules: AvailabilityRule[]): string {
+  if (rules.length === 0) return "Sin franjas cargadas";
+  return rules
+    .map((r) => `${r.daysOfWeek.map((d) => DAY_LABELS[d]).join("/")} ${r.startTime}-${r.endTime}`)
+    .join("; ");
+}
 
 /** avgWaitTimeSeconds arrives as raw seconds — render it human-scannable. */
 function formatWait(seconds: number): string {
@@ -41,14 +53,20 @@ type ModalMode =
   | { type: "delete-terminal"; entity: Terminal }
   | { type: "invite-user" }
   | { type: "edit-user"; entity: AppUser }
-  | { type: "delete-user"; entity: AppUser };
+  | { type: "delete-user"; entity: AppUser }
+  | { type: "create-appt-service" }
+  | { type: "edit-appt-service"; entity: AppointmentService }
+  | { type: "create-appt-block" }
+  | { type: "delete-appt-block"; entity: AppointmentBlock };
 
 export function AdminView() {
-  const [tab, setTab] = useState<"queues" | "terminals" | "sectors" | "stats" | "users">("queues");
+  const [tab, setTab] = useState<"queues" | "terminals" | "sectors" | "stats" | "users" | "agenda">("queues");
   const [queues, setQueues] = useState<Queue[]>([]);
   const [terminals, setTerminals] = useState<Terminal[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
+  const [appointmentServices, setAppointmentServices] = useState<AppointmentService[]>([]);
+  const [appointmentBlocks, setAppointmentBlocks] = useState<AppointmentBlock[]>([]);
   const [statsData, setStatsData] = useState<any>(null);
   const [selectedQueueId, setSelectedQueueId] = useState<string>("");
   const [modal, setModal] = useState<ModalMode>(null);
@@ -63,11 +81,16 @@ export function AdminView() {
 
   const loadData = async () => {
     try {
-      const [s, q, t, u] = await Promise.all([apiListSectors(), apiListQueues(), apiListTerminals(), apiListUsers()]);
+      const [s, q, t, u, as, ab] = await Promise.all([
+        apiListSectors(), apiListQueues(), apiListTerminals(), apiListUsers(),
+        apiListAppointmentServices(), apiListAppointmentBlocks(),
+      ]);
       setSectors(s);
       setQueues(q);
       setTerminals(t);
       setUsers(u);
+      setAppointmentServices(as);
+      setAppointmentBlocks(ab);
     } catch (err) {
       showToast("error", "Error cargando datos");
     } finally {
@@ -104,6 +127,7 @@ export function AdminView() {
     { key: "terminals" as const, label: "Terminales" },
     { key: "sectors" as const, label: "Sectores" },
     { key: "users" as const, label: "Usuarios" },
+    { key: "agenda" as const, label: "Turnos con Cita" },
     { key: "stats" as const, label: "Estadísticas" },
   ];
 
@@ -297,6 +321,118 @@ export function AdminView() {
                 </tbody>
               </table>
             </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── Agenda (Servicios / Bloqueos) — independent of Sector/Queue/Terminal,
+             see docs/turnos-agendados-spec-2026-09-25.md ─── */}
+        {tab === "agenda" && (
+          <div className="adm-section">
+            <div className="adm-section-top">
+              <div className="adm-section-heading">
+                <h2>Servicios agendables</h2>
+                <span className="adm-count-stamp">{appointmentServices.length} registrado{appointmentServices.length !== 1 ? "s" : ""}</span>
+              </div>
+              <button className="adm-btn-new" onClick={() => setModal({ type: "create-appt-service" })}>+ Nuevo Servicio</button>
+            </div>
+            {loadingData ? (
+              <div className="adm-empty"><p className="adm-empty-title">Cargando...</p></div>
+            ) : appointmentServices.length === 0 ? (
+              <div className="adm-empty">
+                <p className="adm-empty-title">Todavía no hay servicios agendables.</p>
+                <p className="adm-empty-sub">Creá uno para habilitar la página pública /agenda.</p>
+              </div>
+            ) : (
+              <div className="adm-table-wrap">
+                <table className="adm-table">
+                  <thead>
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Duración</th>
+                      <th>Capacidad/franja</th>
+                      <th>Horizonte</th>
+                      <th>Disponibilidad</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {appointmentServices.map((s) => (
+                      <tr key={s.id}>
+                        <td className="adm-bold">{s.name}</td>
+                        <td>{s.durationMinutes} min</td>
+                        <td>{s.capacityPerSlot}</td>
+                        <td>{s.bookingHorizonDays} días</td>
+                        <td>{formatAvailabilityRules(s.availabilityRules)}</td>
+                        <td>{s.active ? "Activo" : "Inactivo"}</td>
+                        <td className="adm-actions-cell">
+                          <button className="adm-link-btn" onClick={() => setModal({ type: "edit-appt-service", entity: s })}>Editar</button>
+                          <button
+                            className="adm-link-btn"
+                            onClick={async () => {
+                              try {
+                                await apiUpdateAppointmentService(s.id, { active: !s.active });
+                                showToast("success", s.active ? "Servicio desactivado" : "Servicio reactivado");
+                                loadData();
+                              } catch (e) { showToast("error", e instanceof Error ? e.message : "Error"); }
+                            }}
+                          >
+                            {s.active ? "Desactivar" : "Reactivar"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="adm-section-top" style={{ marginTop: "2rem" }}>
+              <div className="adm-section-heading">
+                <h2>Bloqueos</h2>
+                <span className="adm-count-stamp">{appointmentBlocks.length} registrado{appointmentBlocks.length !== 1 ? "s" : ""}</span>
+              </div>
+              <button
+                className="adm-btn-new"
+                onClick={() => setModal({ type: "create-appt-block" })}
+                disabled={appointmentServices.length === 0}
+              >
+                + Nuevo Bloqueo
+              </button>
+            </div>
+            {appointmentBlocks.length === 0 ? (
+              <div className="adm-empty">
+                <p className="adm-empty-title">Sin bloqueos cargados.</p>
+                <p className="adm-empty-sub">Usalos para feriados o cierres puntuales.</p>
+              </div>
+            ) : (
+              <div className="adm-table-wrap">
+                <table className="adm-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Horario</th>
+                      <th>Servicio</th>
+                      <th>Motivo</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {appointmentBlocks.map((b) => (
+                      <tr key={b.id}>
+                        <td className="adm-bold">{b.date}</td>
+                        <td>{b.startTime && b.endTime ? `${b.startTime}–${b.endTime}` : "Todo el día"}</td>
+                        <td>{b.serviceId ? appointmentServices.find((s) => s.id === b.serviceId)?.name || b.serviceId : "Todos"}</td>
+                        <td>{b.reason || "—"}</td>
+                        <td className="adm-actions-cell">
+                          <button className="adm-link-btn adm-link-danger" onClick={() => setModal({ type: "delete-appt-block", entity: b })}>Eliminar</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
@@ -551,6 +687,61 @@ export function AdminView() {
           onConfirm={async () => {
             setSaving(true);
             try { await apiDeleteUser(modal.entity.id); showToast("success", "Usuario eliminado"); setModal(null); loadData(); }
+            catch (e) { showToast("error", e instanceof Error ? e.message : "Error"); }
+            finally { setSaving(false); }
+          }}
+        />
+      )}
+
+      {modal?.type === "create-appt-service" && (
+        <AppointmentServiceFormModal
+          onClose={() => setModal(null)}
+          saving={saving}
+          onSave={async (data) => {
+            setSaving(true);
+            try { await apiCreateAppointmentService(data); showToast("success", "Servicio creado"); setModal(null); loadData(); }
+            catch (e) { showToast("error", e instanceof Error ? e.message : "Error"); }
+            finally { setSaving(false); }
+          }}
+        />
+      )}
+
+      {modal?.type === "edit-appt-service" && (
+        <AppointmentServiceFormModal
+          service={modal.entity}
+          onClose={() => setModal(null)}
+          saving={saving}
+          onSave={async (data) => {
+            setSaving(true);
+            try { await apiUpdateAppointmentService(modal.entity.id, data); showToast("success", "Servicio actualizado"); setModal(null); loadData(); }
+            catch (e) { showToast("error", e instanceof Error ? e.message : "Error"); }
+            finally { setSaving(false); }
+          }}
+        />
+      )}
+
+      {modal?.type === "create-appt-block" && (
+        <AppointmentBlockFormModal
+          services={appointmentServices}
+          onClose={() => setModal(null)}
+          saving={saving}
+          onSave={async (data) => {
+            setSaving(true);
+            try { await apiCreateAppointmentBlock(data); showToast("success", "Bloqueo creado"); setModal(null); loadData(); }
+            catch (e) { showToast("error", e instanceof Error ? e.message : "Error"); }
+            finally { setSaving(false); }
+          }}
+        />
+      )}
+
+      {modal?.type === "delete-appt-block" && (
+        <ConfirmDeleteModal
+          label={`el bloqueo del ${modal.entity.date}`}
+          onClose={() => setModal(null)}
+          saving={saving}
+          onConfirm={async () => {
+            setSaving(true);
+            try { await apiDeleteAppointmentBlock(modal.entity.id); showToast("success", "Bloqueo eliminado"); setModal(null); loadData(); }
             catch (e) { showToast("error", e instanceof Error ? e.message : "Error"); }
             finally { setSaving(false); }
           }}
@@ -870,6 +1061,192 @@ function ConfirmDeleteModal({ label, onClose, onConfirm, saving }: {
   );
 }
 
+function AppointmentServiceFormModal({ service, onClose, onSave, saving }: {
+  service?: AppointmentService;
+  onClose: () => void;
+  onSave: (data: {
+    name: string;
+    durationMinutes: number;
+    capacityPerSlot: number;
+    bookingHorizonDays: number;
+    availabilityRules: AvailabilityRule[];
+  }) => void;
+  saving: boolean;
+}) {
+  const [name, setName] = useState(service?.name || "");
+  const [durationMinutes, setDurationMinutes] = useState(service?.durationMinutes ?? 15);
+  const [capacityPerSlot, setCapacityPerSlot] = useState(service?.capacityPerSlot ?? 1);
+  const [bookingHorizonDays, setBookingHorizonDays] = useState(service?.bookingHorizonDays ?? 14);
+  const [rules, setRules] = useState<AvailabilityRule[]>(service?.availabilityRules ?? []);
+
+  const addRule = () => setRules((r) => [...r, { daysOfWeek: [1, 2, 3, 4, 5], startTime: "09:00", endTime: "17:00" }]);
+  const removeRule = (index: number) => setRules((r) => r.filter((_, i) => i !== index));
+  const updateRule = (index: number, patch: Partial<AvailabilityRule>) =>
+    setRules((r) => r.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)));
+  const toggleDay = (index: number, day: number) =>
+    setRules((r) => r.map((rule, i) => {
+      if (i !== index) return rule;
+      const daysOfWeek = rule.daysOfWeek.includes(day)
+        ? rule.daysOfWeek.filter((d) => d !== day)
+        : [...rule.daysOfWeek, day].sort();
+      return { ...rule, daysOfWeek };
+    }));
+
+  const isValid = name.trim() && durationMinutes > 0 && capacityPerSlot > 0 && bookingHorizonDays > 0;
+
+  return (
+    <AdminModal title={service ? "Editar Servicio" : "Nuevo Servicio"} onClose={onClose}>
+      <div className="form-group">
+        <label className="form-label">Nombre</label>
+        <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Renovación de carnet" />
+      </div>
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label">Duración de franja (min)</label>
+          <input className="form-input" type="number" min={5} step={5} value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Capacidad por franja</label>
+          <input className="form-input" type="number" min={1} value={capacityPerSlot} onChange={(e) => setCapacityPerSlot(Number(e.target.value))} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Horizonte de reserva (días)</label>
+          <input className="form-input" type="number" min={1} value={bookingHorizonDays} onChange={(e) => setBookingHorizonDays(Number(e.target.value))} />
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Disponibilidad recurrente</label>
+        {rules.map((rule, index) => (
+          <div key={index} className="adm-rule-row">
+            <div className="adm-rule-days">
+              {DAY_LABELS.map((label, day) => (
+                <button
+                  type="button"
+                  key={day}
+                  className={`adm-day-toggle ${rule.daysOfWeek.includes(day) ? "active" : ""}`}
+                  onClick={() => toggleDay(index, day)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <input className="form-input" type="time" value={rule.startTime} onChange={(e) => updateRule(index, { startTime: e.target.value })} />
+            <span>a</span>
+            <input className="form-input" type="time" value={rule.endTime} onChange={(e) => updateRule(index, { endTime: e.target.value })} />
+            <button type="button" className="adm-link-btn adm-link-danger" onClick={() => removeRule(index)}>Quitar</button>
+          </div>
+        ))}
+        <button type="button" className="adm-link-btn" onClick={addRule}>+ Agregar franja horaria</button>
+      </div>
+
+      {!name.trim() && <p className="form-hint">Completá el nombre para guardar.</p>}
+      <div className="form-actions">
+        <button className="form-btn form-btn-cancel" onClick={onClose}>Cancelar</button>
+        <button
+          className="form-btn form-btn-save"
+          disabled={!isValid || saving}
+          onClick={() => onSave({ name: name.trim(), durationMinutes, capacityPerSlot, bookingHorizonDays, availabilityRules: rules })}
+        >
+          {saving ? "Guardando..." : "Guardar"}
+        </button>
+      </div>
+    </AdminModal>
+  );
+}
+
+function AppointmentBlockFormModal({ services, onClose, onSave, saving }: {
+  services: AppointmentService[];
+  onClose: () => void;
+  onSave: (data: { serviceId?: string | null; date: string; startTime?: string; endTime?: string; reason?: string }) => void;
+  saving: boolean;
+}) {
+  const [date, setDate] = useState("");
+  const [allDay, setAllDay] = useState(true);
+  const [startTime, setStartTime] = useState("12:00");
+  const [endTime, setEndTime] = useState("14:00");
+  const [serviceId, setServiceId] = useState("");
+  const [reason, setReason] = useState("");
+  const [impact, setImpact] = useState<{ count: number } | null>(null);
+
+  useEffect(() => {
+    if (!date) return;
+    let cancelled = false;
+    apiPreviewAppointmentBlockImpact({
+      serviceId: serviceId || null,
+      date,
+      startTime: allDay ? undefined : startTime,
+      endTime: allDay ? undefined : endTime,
+    })
+      .then((result) => { if (!cancelled) setImpact(result); })
+      .catch(() => { if (!cancelled) setImpact(null); });
+    return () => { cancelled = true; };
+  }, [date, allDay, startTime, endTime, serviceId]);
+
+  return (
+    <AdminModal title="Nuevo Bloqueo" onClose={onClose}>
+      <div className="form-group">
+        <label className="form-label">Fecha</label>
+        <input className="form-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      </div>
+      <div className="form-group">
+        <label className="form-check">
+          <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
+          <span>Todo el día</span>
+        </label>
+      </div>
+      {!allDay && (
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">Desde</label>
+            <input className="form-input" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Hasta</label>
+            <input className="form-input" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+          </div>
+        </div>
+      )}
+      <div className="form-group">
+        <label className="form-label">Servicio</label>
+        <select className="form-select" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
+          <option value="">Todos los servicios</option>
+          {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Motivo</label>
+        <input className="form-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: Feriado nacional" />
+      </div>
+
+      {date && impact !== null && impact.count > 0 && (
+        <p className="form-hint adm-block-warning">
+          Atención: hay {impact.count} cita{impact.count !== 1 ? "s" : ""} ya confirmada{impact.count !== 1 ? "s" : ""} en ese rango.
+          No se cancelan solas — vas a tener que avisarles vos. Podés confirmar igual.
+        </p>
+      )}
+      {!date && <p className="form-hint">Elegí una fecha para guardar.</p>}
+
+      <div className="form-actions">
+        <button className="form-btn form-btn-cancel" onClick={onClose}>Cancelar</button>
+        <button
+          className="form-btn form-btn-save"
+          disabled={!date || saving}
+          onClick={() => onSave({
+            serviceId: serviceId || null,
+            date,
+            startTime: allDay ? undefined : startTime,
+            endTime: allDay ? undefined : endTime,
+            reason: reason.trim() || undefined,
+          })}
+        >
+          {saving ? "Guardando..." : "Confirmar igual"}
+        </button>
+      </div>
+    </AdminModal>
+  );
+}
+
 // ─── Styles ───
 
 const adminStyles = `
@@ -1181,6 +1558,40 @@ const adminStyles = `
 
   .adm-toast-success { background: var(--secondary); color: white; }
   .adm-toast-error { background: var(--danger); color: white; }
+
+  .adm-rule-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .adm-rule-days { display: flex; gap: 0.25rem; }
+
+  .adm-day-toggle {
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .adm-day-toggle.active {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  .adm-block-warning {
+    color: var(--accent) !important;
+    background: var(--accent-light);
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--radius-sm);
+  }
 
   .adm-body::-webkit-scrollbar { width: 6px; }
   .adm-body::-webkit-scrollbar-track { background: transparent; }

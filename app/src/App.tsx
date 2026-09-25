@@ -16,6 +16,7 @@ const TerminalSelector = lazy(() => import('./views/TerminalSelector').then((m) 
 const TerminalView = lazy(() => import('./views/TerminalView').then((m) => ({ default: m.TerminalView })))
 const AdminView = lazy(() => import('./views/AdminView').then((m) => ({ default: m.AdminView })))
 const LoginView = lazy(() => import('./views/LoginView').then((m) => ({ default: m.LoginView })))
+const AppointmentAgendaView = lazy(() => import('./views/AppointmentAgendaView').then((m) => ({ default: m.AppointmentAgendaView })))
 
 const STAFF_ROLES = [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.CASHIER]
 
@@ -76,6 +77,7 @@ function App() {
                   <li><NavLink to="/display">Pantalla Pública</NavLink></li>
                   <li><NavLink to="/agenda">Agendar Turno</NavLink></li>
                   <li><NavLink to="/agenda/pantalla">Pantalla Agenda</NavLink></li>
+                  <li><NavLink to="/agenda-del-dia">Agenda del Día</NavLink></li>
                   <li><NavLink to="/terminal">Terminal</NavLink></li>
                   <li><NavLink to="/admin">Admin</NavLink></li>
                 </ul>
@@ -92,6 +94,9 @@ function App() {
                   } />
                   <Route path="/admin" element={
                     <RequireAuth roles={[UserRole.ADMIN]}><AdminView /></RequireAuth>
+                  } />
+                  <Route path="/agenda-del-dia" element={
+                    <RequireAuth roles={STAFF_ROLES}><AppointmentAgendaView /></RequireAuth>
                   } />
                 </Routes>
               </Suspense>
