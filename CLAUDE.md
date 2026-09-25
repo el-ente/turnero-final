@@ -41,6 +41,8 @@ pnpm -F functions seed:emulator # Populate test data
 - TypeScript strict mode everywhere
 - `async/await` over `.then()`
 - PascalCase: components & types. camelCase: functions/vars
+- Prioritize code readability, following clean code principles
+- All code must be production-ready
 
 ## Testing
 
