@@ -1,0 +1,15 @@
+meta {
+  name: List Appointment Blocks
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/listAppointmentBlocks
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}

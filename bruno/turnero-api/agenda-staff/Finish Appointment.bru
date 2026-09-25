@@ -1,0 +1,21 @@
+meta {
+  name: Finish Appointment
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/finishAppointment
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+body:json {
+  {
+    "appointmentId": ""
+  }
+}

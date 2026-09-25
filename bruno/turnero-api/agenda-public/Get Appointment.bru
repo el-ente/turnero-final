@@ -1,0 +1,16 @@
+meta {
+  name: Get Appointment
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/getAppointment?appointmentId={{appointmentId}}&memberNumber={{memberNumber}}
+  body: none
+  auth: none
+}
+
+params:query {
+  appointmentId:
+  memberNumber:
+}

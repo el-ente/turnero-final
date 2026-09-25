@@ -1,0 +1,23 @@
+meta {
+  name: Create Appointment Block
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/createAppointmentBlock
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+body:json {
+  {
+    "serviceId": null,
+    "date": "",
+    "reason": "Feriado"
+  }
+}

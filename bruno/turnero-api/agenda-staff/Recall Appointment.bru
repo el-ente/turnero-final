@@ -1,0 +1,21 @@
+meta {
+  name: Recall Appointment
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/recallAppointment
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+body:json {
+  {
+    "appointmentId": ""
+  }
+}

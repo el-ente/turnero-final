@@ -1,0 +1,17 @@
+meta {
+  name: Get Available Slots
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/getAvailableSlots?serviceId={{serviceId}}&dateFrom={{dateFrom}}&dateTo={{dateTo}}
+  body: none
+  auth: none
+}
+
+params:query {
+  serviceId:
+  dateFrom:
+  dateTo:
+}

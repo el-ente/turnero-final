@@ -1,0 +1,25 @@
+meta {
+  name: Update Appointment Service
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/updateAppointmentService?serviceId={{serviceId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+params:query {
+  serviceId:
+}
+
+body:json {
+  {
+    "active": true
+  }
+}

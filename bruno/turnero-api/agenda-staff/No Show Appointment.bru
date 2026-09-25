@@ -1,0 +1,21 @@
+meta {
+  name: No Show Appointment
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/noShowAppointment
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+body:json {
+  {
+    "appointmentId": ""
+  }
+}

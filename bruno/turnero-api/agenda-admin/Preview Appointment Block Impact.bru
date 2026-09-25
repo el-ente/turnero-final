@@ -1,0 +1,22 @@
+meta {
+  name: Preview Appointment Block Impact
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/previewAppointmentBlockImpact?date={{date}}&serviceId={{serviceId}}&startTime={{startTime}}&endTime={{endTime}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+params:query {
+  date:
+  serviceId:
+  startTime:
+  endTime:
+}

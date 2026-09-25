@@ -1,0 +1,27 @@
+meta {
+  name: Create Appointment Service
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/createAppointmentService
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+body:json {
+  {
+    "name": "",
+    "durationMinutes": 15,
+    "capacityPerSlot": 1,
+    "bookingHorizonDays": 14,
+    "availabilityRules": [
+      { "daysOfWeek": [1, 2, 3, 4, 5], "startTime": "09:00", "endTime": "17:00" }
+    ]
+  }
+}

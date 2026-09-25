@@ -1,0 +1,22 @@
+meta {
+  name: Create Appointment
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/createAppointment
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "serviceId": "",
+    "date": "",
+    "startTime": "",
+    "memberNumber": 12345,
+    "contactName": "",
+    "contact": ""
+  }
+}

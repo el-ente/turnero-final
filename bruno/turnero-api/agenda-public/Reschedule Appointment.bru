@@ -1,0 +1,20 @@
+meta {
+  name: Reschedule Appointment
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/rescheduleAppointment
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "appointmentId": "",
+    "memberNumber": 12345,
+    "newDate": "",
+    "newStartTime": ""
+  }
+}

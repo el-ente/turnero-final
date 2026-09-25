@@ -109,6 +109,9 @@ Crea datos de prueba: 3 sectores (Farmacia, Perfumería, PAMI), 6 colas (regular
 | **Display** | `/display` | Pantalla pública de sala de espera | Brutal cyan/magenta, números ENORMES | Público |
 | **Terminal** | `/terminal` | Operador atiende turnos | Industrial verde neon, panel de control | Login (admin/supervisor/cajero) |
 | **Admin** | `/admin` | Administrador configura sistema | Dashboard moderno azul/púrpura | Login (admin) |
+| **Agendar Turno** | `/agenda`, `/agenda/:appointmentId` | Cliente reserva/consulta/cancela/reprograma una Cita para un día y horario específico | Mismo estilo que Mi Turno | Público |
+| **Pantalla Agenda** | `/agenda/pantalla` | Anuncio público (sonido/flash) de Citas llamadas — sin PII | Igual que Display, sin datos de Turn | Público |
+| **Agenda del Día** | `/agenda-del-dia` | Staff atiende Citas del día por horario (sin motor de despacho, no es Terminal) | Lista simple por horario | Login (admin/supervisor/cajero) |
 
 ## 📡 API Endpoints
 
@@ -219,6 +222,69 @@ DELETE /deleteUser?userId=<id>
   # Revoca acceso (borra el perfil; la cuenta de Google sigue existiendo, solo pierde permisos)
 ```
 
+### Agenda de Citas
+
+Módulo **completamente independiente** de Sector/Queue/Terminal/Turn (no lee ni escribe esas colecciones, no comparte lógica de negocio) — ver `docs/turnos-agendados-spec-2026-09-25.md`. Vive en la misma plataforma (mismo proyecto Firebase, mismo panel Admin).
+
+Identidad/autogestión con el mismo criterio "liviano" que ya usa Turn hoy: el `appointmentId` (código de Cita) + `memberNumber` deben coincidir — sin OTP ni cuentas de cliente. `Appointment` tiene PII (`contactName`/`contact`) y por eso, a diferencia de `turns`, **no es de lectura pública**: el cliente siempre lee su propia Cita vía Cloud Function, nunca por listener directo.
+
+Público, sin auth (rate-limited por IP; `createAppointment`/`cancelAppointment`/`rescheduleAppointment` además por `memberNumber`):
+
+```bash
+GET  /getAvailableSlots?serviceId=svc-1&dateFrom=2026-10-01&dateTo=2026-10-15
+  → [{ date, startTime, remainingCapacity }]
+  # Clampeado server-side al bookingHorizonDays del Servicio, sin importar qué rango pida el caller.
+
+POST /createAppointment
+  { serviceId, date, startTime, memberNumber, contactName, contact? }
+  → Appointment (status: "reservada")
+  # Transaccional: valida franja ofrecida + no bloqueada + con cupo, y que el memberNumber
+  # no tenga ya otra Cita activa EN ESE MISMO Servicio (sí puede tener una en otro Servicio).
+
+GET  /getAppointment?appointmentId=<id>&memberNumber=12345
+  → Appointment
+
+POST /cancelAppointment      { appointmentId, memberNumber }
+  # Solo mientras está "reservada" — mismo criterio que cancelTurn con WAITING.
+
+POST /rescheduleAppointment  { appointmentId, memberNumber, newDate, newStartTime }
+  → Appointment
+  # Update in-place de la misma Cita (no cancelar+crear): si la franja nueva no está
+  # disponible, no escribe nada y la Cita original queda intacta.
+```
+
+Staff (login admin/supervisor/cajero — mismos roles que Terminal, sin scoping por sector):
+
+```bash
+POST /callAppointment    { appointmentId }   # reservada → llamada; escribe appointmentCalls/{id}
+POST /recallAppointment  { appointmentId }   # llamada → llamada, recallCount++
+POST /startAppointment   { appointmentId }   # llamada → atendiendo
+POST /finishAppointment  { appointmentId }   # atendiendo → finalizada
+POST /noShowAppointment  { appointmentId }   # llamada → no_show — MANUAL, sin vencimiento automático de tolerancia
+
+GET  /getAppointmentsByDate?date=2026-10-01&serviceId=svc-1
+  → Appointment[]   # serviceId opcional
+```
+
+Admin — Servicio y Bloqueo (`GET` lista, `POST` crea, `PUT`/`DELETE` con `?<id>=...`):
+
+```bash
+POST /createAppointmentService  { name, durationMinutes, capacityPerSlot, availabilityRules[], bookingHorizonDays? }
+GET  /listAppointmentServices
+PUT  /updateAppointmentService?serviceId=svc-1   { name?, durationMinutes?, capacityPerSlot?, availabilityRules?, bookingHorizonDays?, active? }
+  # No hay endpoint de borrado físico — "desactivar" es active:false.
+
+POST   /createAppointmentBlock  { serviceId?, date, startTime?, endTime?, reason? }
+  # serviceId omitido/null = aplica a todos los Servicios. Sin startTime/endTime = bloquea el día completo.
+GET    /listAppointmentBlocks
+DELETE /deleteAppointmentBlock?blockId=block-1
+
+GET /previewAppointmentBlockImpact?date=2026-12-25&serviceId=svc-1&startTime=12:00&endTime=14:00
+  → { count, appointments }
+  # Se llama ANTES de crear el Bloqueo, para avisar si pisa Citas ya confirmadas.
+  # createAppointmentBlock nunca cancela nada solo ni bloquea el guardado por esto.
+```
+
 ## 🧪 Testing
 
 ```bash
@@ -232,7 +298,7 @@ pnpm -F functions test:watch
 pnpm -F functions test:coverage
 ```
 
-**136 tests** covering turnService, queueService, terminalService, statsService, adminService, y la capa de auth (middleware + gating de cada endpoint protegido).
+**211 tests** covering turnService, queueService, terminalService, statsService, adminService, la capa de auth (middleware + gating de cada endpoint protegido), y el módulo de Agenda (appointmentAvailability, appointmentService, appointmentStaffService, appointmentConfigService, y rate-limit/auth-gating de sus controllers).
 
 ### Testing Manual
 
@@ -286,6 +352,15 @@ firebase deploy --project dev --only hosting:app
 
 El ticket mostrado en Totem/Display/Terminal **es** `memberNumber` — no hay numeración secuencial diaria ni reset a medianoche. `queuedAt` es la clave de orden interna (= `createdAt` al crear el turno, se adelanta al reencolar por no-show) y reemplaza los antiguos `originalTurnNumber`/`currentTurnNumber`.
 
+**Agenda de Citas** (módulo independiente, sin relación con las collections de arriba):
+
+- **appointmentServices**: { id, name, active, durationMinutes, capacityPerSlot, availabilityRules[] (`{daysOfWeek[], startTime, endTime}`), bookingHorizonDays, createdAt, updatedAt }
+- **appointmentBlocks**: { id, serviceId (`null` = todos los Servicios), date, startTime?, endTime? (sin horario = todo el día), reason?, createdAt }
+- **appointments**: { id, serviceId, date, startTime, memberNumber, contactName, contact?, status (`reservada`\|`llamada`\|`atendiendo`\|`finalizada`\|`cancelada`\|`no_show`), recallCount, createdAt, calledAt?, attendingAt?, finishedAt?, cancelledAt? } — **no es de lectura pública** (tiene PII), a diferencia de todo lo demás en esta lista.
+- **appointmentCalls**: { appointmentId, serviceName, startTime, calledAt, recallCount } — espejo público sin PII de la Cita que está siendo llamada en este momento, solo para alimentar `/agenda/pantalla`. Se borra al iniciar la atención o marcar no-show.
+
+No hay "Franja" como collection: las franjas se calculan al vuelo a partir de `availabilityRules` + `appointmentBlocks` + conteo de `appointments` activas, dentro de la misma transacción que reserva — evita mantener un esquema de generación/materialización de slots aparte.
+
 ## 🔌 Estrategias de Servicio
 
 **FIFO Across Queues**: Atiende turnos por número global.
@@ -301,6 +376,7 @@ El ticket mostrado en Totem/Display/Terminal **es** `memberNumber` — no hay nu
 - [x] Phase 11: Unit tests
 - [x] Phase 12: Firestore security rules (`firestore.rules` real: lectura pública de sectors/queues/terminals/turns para Totem/Display; `users` restringido al propio doc o admin/supervisor; toda escritura pasa por Cloud Functions con Admin SDK, así que las rules la deniegan siempre)
 - [x] Phase 13: Firebase Auth (Google Sign-In, roles admin/supervisor/cashier, cajero restringido a `assignedSectorIds`). Pendiente como follow-up: UI dedicada para las capacidades de supervisor (hoy solo tiene permiso de ver stats vía backend, sin pantalla propia) y refresco de token en la ventana flotante PiP más allá de lo que ya cubre compartir el mismo contexto JS
+- [x] Agenda de Citas: módulo independiente de reservas por día/horario (`/agenda`, `/agenda/pantalla`, `/agenda-del-dia`, tab "Turnos con Cita" en Admin) — ver `docs/turnos-agendados-spec-2026-09-25.md`
 - [ ] Phase 14: WhatsApp integration
 - [ ] Phase 15: Mobile app
 

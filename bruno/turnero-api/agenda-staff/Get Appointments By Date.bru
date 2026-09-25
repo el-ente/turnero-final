@@ -1,0 +1,20 @@
+meta {
+  name: Get Appointments By Date
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/getAppointmentsByDate?date={{date}}&serviceId={{serviceId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+params:query {
+  date:
+  serviceId:
+}

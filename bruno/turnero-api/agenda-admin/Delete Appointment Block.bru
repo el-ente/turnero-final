@@ -1,0 +1,19 @@
+meta {
+  name: Delete Appointment Block
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/deleteAppointmentBlock?blockId={{blockId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+params:query {
+  blockId:
+}
