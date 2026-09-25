@@ -39,13 +39,17 @@ export async function getUserByUid(uid: string): Promise<AppUser | null> {
 //     see the signup in the Users tab and activate it.
 export async function bootstrapUser(uid: string, email: string, displayName?: string): Promise<AppUser> {
   const normalizedEmail = email.toLowerCase();
+  // Firestore rejects `undefined` field values outright — a Google account
+  // without a profile display name (rare, but possible) would otherwise 500
+  // on every first-login bootstrap attempt.
+  const safeDisplayName = displayName || "";
   const userRef = db.collection(USERS).doc(uid);
 
   return db.runTransaction(async (tx) => {
     const existing = await tx.get(userRef);
     if (existing.exists) {
-      tx.update(userRef, {email: normalizedEmail, displayName, updatedAt: new Date()});
-      return toAppUser(uid, {...existing.data(), email: normalizedEmail, displayName});
+      tx.update(userRef, {email: normalizedEmail, displayName: safeDisplayName, updatedAt: new Date()});
+      return toAppUser(uid, {...existing.data(), email: normalizedEmail, displayName: safeDisplayName});
     }
 
     const inviteSnap = await tx.get(
@@ -60,7 +64,7 @@ export async function bootstrapUser(uid: string, email: string, displayName?: st
       data = {
         uid,
         email: normalizedEmail,
-        displayName,
+        displayName: safeDisplayName,
         role: inviteData.role,
         assignedSectorIds: inviteData.assignedSectorIds || [],
         status: UserStatus.ACTIVE,
@@ -72,7 +76,7 @@ export async function bootstrapUser(uid: string, email: string, displayName?: st
       data = {
         uid,
         email: normalizedEmail,
-        displayName,
+        displayName: safeDisplayName,
         role: UserRole.ADMIN,
         assignedSectorIds: [],
         status: UserStatus.ACTIVE,
@@ -83,7 +87,7 @@ export async function bootstrapUser(uid: string, email: string, displayName?: st
       data = {
         uid,
         email: normalizedEmail,
-        displayName,
+        displayName: safeDisplayName,
         role: UserRole.CASHIER, // inert placeholder: status=pending blocks all access regardless
         assignedSectorIds: [],
         status: UserStatus.PENDING,
