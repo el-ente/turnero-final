@@ -2,6 +2,10 @@
 
 Queue management system — totem, display, terminal, admin views.
 
+## Language
+
+- In this project, Spanish is allowed. Ignore global RULE #1 ("only English") here.
+
 ## Stack
 
 - **Monorepo**: pnpm workspaces (`app`, `functions`, `shared`)
