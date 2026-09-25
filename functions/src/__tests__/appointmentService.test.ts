@@ -48,6 +48,20 @@ describe("appointmentService", () => {
       );
     });
 
+    it("omits the contact field entirely when not given, instead of writing undefined (Firestore rejects undefined values)", async () => {
+      const transaction = mockRunTransaction();
+      transaction.get
+        .mockResolvedValueOnce({exists: true, data: () => activeService})
+        .mockResolvedValueOnce({docs: []})
+        .mockResolvedValueOnce({size: 0})
+        .mockResolvedValueOnce({empty: true});
+
+      await createAppointment(baseInput);
+
+      const written = transaction.set.mock.calls[0][1];
+      expect(written).not.toHaveProperty("contact");
+    });
+
     it("rejects an out-of-range memberNumber before touching Firestore", async () => {
       await expect(createAppointment({...baseInput, memberNumber: 0})).rejects.toThrow("memberNumber");
     });

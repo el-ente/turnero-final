@@ -298,7 +298,7 @@ pnpm -F functions test:watch
 pnpm -F functions test:coverage
 ```
 
-**211 tests** covering turnService, queueService, terminalService, statsService, adminService, la capa de auth (middleware + gating de cada endpoint protegido), y el módulo de Agenda (appointmentAvailability, appointmentService, appointmentStaffService, appointmentConfigService, y rate-limit/auth-gating de sus controllers).
+**213 tests** covering turnService, queueService, terminalService, statsService, adminService, la capa de auth (middleware + gating de cada endpoint protegido), y el módulo de Agenda (appointmentAvailability, appointmentService, appointmentStaffService, appointmentConfigService, y rate-limit/auth-gating de sus controllers).
 
 ### Testing Manual
 

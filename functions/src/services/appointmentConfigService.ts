@@ -113,9 +113,11 @@ export async function createAppointmentBlock(data: {
     id: ref.id,
     serviceId: data.serviceId ?? null,
     date: data.date,
-    startTime: data.startTime,
-    endTime: data.endTime,
-    reason: data.reason,
+    // Firestore rejects `undefined` field values outright — omit rather
+    // than set them when not given.
+    ...(data.startTime ? {startTime: data.startTime} : {}),
+    ...(data.endTime ? {endTime: data.endTime} : {}),
+    ...(data.reason ? {reason: data.reason} : {}),
     createdAt: new Date(),
   };
   await ref.set(block);

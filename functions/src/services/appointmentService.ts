@@ -136,7 +136,9 @@ export async function createAppointment(data: {
       startTime,
       memberNumber,
       contactName,
-      contact,
+      // Firestore rejects `undefined` field values outright — omit rather
+      // than set it when no contact was given.
+      ...(contact ? {contact} : {}),
       status: AppointmentStatus.RESERVADA,
       recallCount: 0,
       createdAt: new Date(),

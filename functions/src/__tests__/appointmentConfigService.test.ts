@@ -89,6 +89,18 @@ describe("appointmentConfigService", () => {
       expect(result.startTime).toBeUndefined();
     });
 
+    it("omits startTime/endTime/reason entirely when not given, instead of writing undefined", async () => {
+      const setSpy = jest.fn().mockResolvedValue(undefined);
+      (db.collection as jest.Mock).mockImplementation(() => chainable({set: setSpy}));
+
+      await createAppointmentBlock({date: "2026-12-25"});
+
+      const written = setSpy.mock.calls[0][0];
+      expect(written).not.toHaveProperty("startTime");
+      expect(written).not.toHaveProperty("endTime");
+      expect(written).not.toHaveProperty("reason");
+    });
+
     it("rejects when only one of startTime/endTime is given", async () => {
       await expect(createAppointmentBlock({date: "2026-12-25", startTime: "12:00"})).rejects.toThrow();
     });
