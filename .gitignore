@@ -13,6 +13,8 @@ firebase-debug.*.log*
 # Firebase CLI local agent-skill files
 .agents/
 .claude/
+!.claude/agents/
+!.claude/agents/functional-analyst.md
 skills-lock.json
 
 # Vendored shared package for Cloud Functions deploy (see firebase.json predeploy)
