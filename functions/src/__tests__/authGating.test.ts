@@ -13,6 +13,8 @@ jest.mock("firebase-functions/v2/https", () => ({
 import * as terminalController from "../controllers/terminalController";
 import * as adminController from "../controllers/adminController";
 import * as userController from "../controllers/userController";
+import * as appointmentStaffController from "../controllers/appointmentStaffController";
+import * as appointmentAdminController from "../controllers/appointmentAdminController";
 import {db} from "../config/firebase-admin";
 
 jest.mock("../config/firebase-admin");
@@ -54,6 +56,19 @@ const GATED_HANDLERS: Record<string, (req: any, res: any) => void | Promise<void
   "user.invite": userController.inviteUserHandler,
   "user.updateRole": userController.updateUserRoleHandler,
   "user.delete": userController.deleteUserHandler,
+  "appointmentStaff.call": appointmentStaffController.callAppointmentHandler,
+  "appointmentStaff.recall": appointmentStaffController.recallAppointmentHandler,
+  "appointmentStaff.start": appointmentStaffController.startAppointmentHandler,
+  "appointmentStaff.finish": appointmentStaffController.finishAppointmentHandler,
+  "appointmentStaff.noShow": appointmentStaffController.noShowAppointmentHandler,
+  "appointmentStaff.getByDate": appointmentStaffController.getAppointmentsByDateHandler,
+  "appointmentAdmin.createService": appointmentAdminController.createAppointmentServiceHandler,
+  "appointmentAdmin.listServices": appointmentAdminController.listAppointmentServicesHandler,
+  "appointmentAdmin.updateService": appointmentAdminController.updateAppointmentServiceHandler,
+  "appointmentAdmin.createBlock": appointmentAdminController.createAppointmentBlockHandler,
+  "appointmentAdmin.listBlocks": appointmentAdminController.listAppointmentBlocksHandler,
+  "appointmentAdmin.deleteBlock": appointmentAdminController.deleteAppointmentBlockHandler,
+  "appointmentAdmin.previewBlockImpact": appointmentAdminController.previewAppointmentBlockImpactHandler,
 };
 
 describe("every staff/admin handler requires auth", () => {

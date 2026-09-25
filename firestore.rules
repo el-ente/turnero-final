@@ -43,5 +43,33 @@ service cloud.firestore {
       allow read: if signedIn() && (request.auth.uid == userId || myRole() in ['admin', 'supervisor']);
       allow write: if false;
     }
+
+    // Agenda module — fully independent of the collections above, see
+    // docs/turnos-agendados-spec-2026-09-25.md. Services and blocks are
+    // config, safe to read publicly (needed to show availability). Calls are
+    // a PII-free mirror of appointments, built specifically to feed the
+    // module's public announcement screen.
+    match /appointmentServices/{serviceId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /appointmentBlocks/{blockId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /appointmentCalls/{appointmentId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Appointments hold PII (contactName/contact) — unlike turns, this is
+    // NOT publicly readable. Clients read their own appointment through a
+    // Cloud Function (appointmentId + memberNumber), not a live listener.
+    match /appointments/{appointmentId} {
+      allow read: if signedIn() && myRole() in ['admin', 'supervisor', 'cashier'];
+      allow write: if false;
+    }
   }
 }

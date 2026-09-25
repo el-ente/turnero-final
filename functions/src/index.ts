@@ -18,6 +18,19 @@ import {
 import {
   bootstrapUserHandler, listUsersHandler, inviteUserHandler, updateUserRoleHandler, deleteUserHandler,
 } from "./controllers/userController";
+import {
+  createAppointmentHandler, getAvailableSlotsHandler, getAppointmentHandler,
+  cancelAppointmentHandler, rescheduleAppointmentHandler,
+} from "./controllers/appointmentController";
+import {
+  callAppointmentHandler, recallAppointmentHandler, startAppointmentHandler,
+  finishAppointmentHandler, noShowAppointmentHandler, getAppointmentsByDateHandler,
+} from "./controllers/appointmentStaffController";
+import {
+  createAppointmentServiceHandler, listAppointmentServicesHandler, updateAppointmentServiceHandler,
+  createAppointmentBlockHandler, listAppointmentBlocksHandler, deleteAppointmentBlockHandler,
+  previewAppointmentBlockImpactHandler,
+} from "./controllers/appointmentAdminController";
 
 setGlobalOptions({maxInstances: 10});
 
@@ -62,3 +75,27 @@ export const listUsers = listUsersHandler;
 export const inviteUser = inviteUserHandler;
 export const updateUserRole = updateUserRoleHandler;
 export const deleteUser = deleteUserHandler;
+
+// Agenda endpoints — independent module, see docs/turnos-agendados-spec-2026-09-25.md
+export const createAppointment = createAppointmentHandler;
+export const getAvailableSlots = getAvailableSlotsHandler;
+export const getAppointment = getAppointmentHandler;
+export const cancelAppointment = cancelAppointmentHandler;
+export const rescheduleAppointment = rescheduleAppointmentHandler;
+
+// Agenda — staff ("Agenda del día")
+export const callAppointment = callAppointmentHandler;
+export const recallAppointment = recallAppointmentHandler;
+export const startAppointment = startAppointmentHandler;
+export const finishAppointment = finishAppointmentHandler;
+export const noShowAppointment = noShowAppointmentHandler;
+export const getAppointmentsByDate = getAppointmentsByDateHandler;
+
+// Agenda — admin config (Servicio / Bloqueo)
+export const createAppointmentService = createAppointmentServiceHandler;
+export const listAppointmentServices = listAppointmentServicesHandler;
+export const updateAppointmentService = updateAppointmentServiceHandler;
+export const createAppointmentBlock = createAppointmentBlockHandler;
+export const listAppointmentBlocks = listAppointmentBlocksHandler;
+export const deleteAppointmentBlock = deleteAppointmentBlockHandler;
+export const previewAppointmentBlockImpact = previewAppointmentBlockImpactHandler;

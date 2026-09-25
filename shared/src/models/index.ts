@@ -1,3 +1,4 @@
+export * from "./appointment";
 export * from "./sector";
 export * from "./queue";
 export * from "./terminal";
