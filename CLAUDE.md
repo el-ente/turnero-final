@@ -59,6 +59,7 @@ pnpm -F functions seed:emulator # Populate test data
 
 ## Git Workflow
 
+- Commit right after finishing a change — don't wait until the end of a session or until asked.
 - Always commit at the end of a coding session — don't leave finished work uncommitted.
 - Group unrelated changes into separate, focused commits rather than one bundled commit.
 
