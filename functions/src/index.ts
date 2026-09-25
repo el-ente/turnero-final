@@ -7,6 +7,7 @@ import {
   finishTurnHandler,
   recallTurnHandler,
   noShowHandler,
+  reassignTerminalQueuesHandler,
 } from "./controllers/terminalController";
 import {
   getQueueStatsHandler,
@@ -32,6 +33,7 @@ export const startTurn = startTurnHandler;
 export const finishTurn = finishTurnHandler;
 export const recallTurn = recallTurnHandler;
 export const noShow = noShowHandler;
+export const reassignTerminalQueues = reassignTerminalQueuesHandler;
 
 // Admin endpoints
 export const getQueueStats = getQueueStatsHandler;

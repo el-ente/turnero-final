@@ -2,12 +2,16 @@ import {onRequest} from "firebase-functions/v2/https";
 import {AppUser, UserRole, canAccessTerminal} from "shared";
 import {
   getNextTurn, callTurn, startTurn, finishTurn, recallTurn, handleNoShow, getTerminalById,
+  reassignTerminalQueues,
 } from "../services/terminalService";
 import {BusinessError, ForbiddenError} from "../utils/errors";
 import {logger} from "../config/firebase-admin";
 import {requireRole} from "../middleware/auth";
 
 const STAFF_ROLES = [UserRole.CASHIER, UserRole.SUPERVISOR, UserRole.ADMIN];
+
+// Firestore "in" caps at 30 values (same assumption as adminService.ts's deleteSector).
+const MAX_QUEUE_IDS = 30;
 
 // A cashier may only operate terminals in their assigned sector(s); admin
 // and supervisor can operate any terminal.
@@ -180,6 +184,43 @@ export const noShowHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, as
       res.status(error.statusCode).json({error: error.message, code: error.code});
     } else {
       logger.error("Error handling no-show:", error);
+      res.status(500).json({error: "Internal server error"});
+    }
+  }
+}));
+
+// Self-service: lets the operator change which queues their own terminal
+// serves, without going through Admin. Only allowed while the terminal isn't
+// mid-turn (see reassignTerminalQueues) — the button that drives this is
+// disabled client-side too, but the check has to hold server-side regardless.
+export const reassignTerminalQueuesHandler = onRequest({cors: true}, requireRole(STAFF_ROLES, async (req, res, user) => {
+  try {
+    if (req.method !== "POST") {
+      res.status(405).json({error: "Method not allowed"});
+      return;
+    }
+
+    const {terminalId, queueIds} = req.body;
+    const queueIdsAreStrings = Array.isArray(queueIds) && queueIds.every((id: unknown) => typeof id === "string");
+    if (!terminalId || !queueIdsAreStrings) {
+      res.status(400).json({error: "terminalId and queueIds (string[]) are required"});
+      return;
+    }
+    const uniqueQueueIds: string[] = Array.from(new Set(queueIds));
+    if (uniqueQueueIds.length === 0 || uniqueQueueIds.length > MAX_QUEUE_IDS) {
+      res.status(400).json({error: `queueIds must contain 1 to ${MAX_QUEUE_IDS} unique ids`});
+      return;
+    }
+
+    await assertTerminalAccess(user, terminalId);
+
+    const updated = await reassignTerminalQueues(terminalId, uniqueQueueIds);
+    res.status(200).json(updated);
+  } catch (error) {
+    if (error instanceof BusinessError) {
+      res.status(error.statusCode).json({error: error.message, code: error.code});
+    } else {
+      logger.error("Error reassigning terminal queues:", error);
       res.status(500).json({error: "Internal server error"});
     }
   }

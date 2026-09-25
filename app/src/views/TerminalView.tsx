@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useParams, Navigate } from "react-router-dom";
-import type { Turn, Terminal } from "shared";
+import type { Turn, Terminal, Queue } from "shared";
 import { db } from "../lib/firebase";
 import { doc, onSnapshot, collection, query, where } from "firebase/firestore";
 import {
@@ -12,6 +12,7 @@ import {
   noShowTurn,
   recallTurn,
   apiUpdateTerminal,
+  apiReassignTerminalQueues,
 } from "../lib/api";
 import { toDate } from "../lib/dates";
 import { STATUS_LABELS } from "../lib/turnStatusLabels";
@@ -31,6 +32,9 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [confirmingNoShow, setConfirmingNoShow] = useState(false);
+  const [queues, setQueues] = useState<Queue[]>([]);
+  const [editingQueues, setEditingQueues] = useState(false);
+  const [selectedQueueIds, setSelectedQueueIds] = useState<string[]>([]);
   const { isSupported: pipSupported, pipWindow, openPipWindow } = usePipWindow();
 
   // Tracks which listeners are currently erroring so the operator sees a
@@ -56,6 +60,29 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     );
     return unsubscribe;
   }, [terminalId]);
+
+  const terminalSectorIdsKey = terminal?.sectorIds.join(",");
+
+  useEffect(() => {
+    if (!terminal || terminal.sectorIds.length === 0) {
+      setQueues([]);
+      return;
+    }
+    const q = query(collection(db, "queues"), where("sectorId", "in", terminal.sectorIds));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setListenerError("queues", false);
+        setQueues(snapshot.docs.map((doc) => doc.data() as Queue));
+      },
+      (error) => {
+        console.error("TerminalView queues listener:", error);
+        setListenerError("queues", true);
+      }
+    );
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terminalSectorIdsKey]);
 
   const activeQueueIdsKey = terminal?.activeQueueIds.join(",");
 
@@ -112,6 +139,10 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
   useEffect(() => {
     setConfirmingNoShow(false);
   }, [currentTurn?.id]);
+
+  useEffect(() => {
+    if (terminal?.currentTurnId) setEditingQueues(false);
+  }, [terminal?.currentTurnId]);
 
   const showMessage = (type: "success" | "error", text: string) => {
     setMessage({ type, text });
@@ -213,6 +244,34 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     }
   };
 
+  const selectableQueues = queues.filter((q) => q.active);
+  const activeQueueNames = (terminal?.activeQueueIds || [])
+    .map((id) => queues.find((q) => q.id === id)?.name)
+    .filter((name): name is string => !!name);
+  const queuePlural = terminal?.activeQueueIds.length !== 1 ? "s" : "";
+
+  const openQueueEditor = () => {
+    setSelectedQueueIds(terminal?.activeQueueIds || []);
+    setEditingQueues(true);
+  };
+
+  const toggleQueueSelection = (id: string) => {
+    setSelectedQueueIds((prev) => (prev.includes(id) ? prev.filter((q) => q !== id) : [...prev, id]));
+  };
+
+  const handleSaveQueues = async () => {
+    setLoading(true);
+    try {
+      await apiReassignTerminalQueues(terminalId, selectedQueueIds);
+      showMessage("success", "Filas actualizadas");
+      setEditingQueues(false);
+    } catch (err) {
+      showMessage("error", err instanceof Error ? err.message : "Error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRecallTurn = async () => {
     if (!currentTurn) return;
     setLoading(true);
@@ -245,6 +304,59 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
           <button className="term-pause-btn" onClick={handleToggleTerminalStatus} disabled={!terminal}>
             {terminal?.status === "offline" ? "Reanudar" : "Pausar"}
           </button>
+        </div>
+
+        <div className="term-queues-card">
+          <div className="term-queues-header">
+            <span>Fila{queuePlural} asignada{queuePlural}</span>
+            {!editingQueues && (
+              <button
+                className="term-queues-edit-btn"
+                onClick={openQueueEditor}
+                disabled={!terminal || !!terminal.currentTurnId}
+              >
+                Cambiar
+              </button>
+            )}
+          </div>
+
+          {!editingQueues ? (
+            <div className="term-queues-chips">
+              {activeQueueNames.map((name) => (
+                <span key={name} className="term-queue-chip">{name}</span>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="term-queues-chips">
+                {selectableQueues.map((q) => (
+                  <span
+                    key={q.id}
+                    className={`term-queue-chip term-queue-chip-toggle ${selectedQueueIds.includes(q.id) ? "active" : ""}`}
+                    onClick={() => toggleQueueSelection(q.id)}
+                  >
+                    {q.name}
+                  </span>
+                ))}
+              </div>
+              <div className="term-queues-actions">
+                <button
+                  className="term-queues-save-btn"
+                  onClick={handleSaveQueues}
+                  disabled={loading || selectedQueueIds.length === 0}
+                >
+                  Guardar
+                </button>
+                <button className="term-queues-cancel-btn" onClick={() => setEditingQueues(false)} disabled={loading}>
+                  Cancelar
+                </button>
+              </div>
+            </>
+          )}
+
+          {terminal?.currentTurnId && (
+            <div className="term-queues-hint">Finalizá el turno actual antes de cambiar de fila</div>
+          )}
         </div>
 
         {hasConnectionError && (
@@ -439,6 +551,115 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
         .term-pause-btn:hover:not(:disabled) {
           border-color: var(--text-light);
           color: var(--text);
+        }
+
+        .term-queues-card {
+          padding: 0.85rem 1rem;
+          background: var(--surface-warm);
+          border-radius: var(--radius);
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+        }
+
+        .term-queues-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 0.75rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: var(--text-muted);
+        }
+
+        .term-queues-edit-btn {
+          padding: 0.2rem 0.55rem;
+          background: transparent;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm);
+          color: var(--text-muted);
+          font-family: var(--font-body);
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: none;
+          letter-spacing: normal;
+          cursor: pointer;
+        }
+
+        .term-queues-edit-btn:hover:not(:disabled) {
+          border-color: var(--accent);
+          color: var(--accent);
+        }
+
+        .term-queues-edit-btn:disabled {
+          opacity: 0.35;
+          cursor: not-allowed;
+        }
+
+        .term-queues-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.4rem;
+        }
+
+        .term-queue-chip {
+          padding: 0.3rem 0.65rem;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 999px;
+          font-size: 0.78rem;
+          color: var(--text);
+        }
+
+        .term-queue-chip-toggle {
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .term-queue-chip-toggle.active {
+          background: var(--primary-light);
+          border-color: var(--primary);
+          color: var(--primary);
+          font-weight: 600;
+        }
+
+        .term-queues-actions {
+          display: flex;
+          gap: 0.5rem;
+        }
+
+        .term-queues-save-btn,
+        .term-queues-cancel-btn {
+          padding: 0.35rem 0.75rem;
+          border-radius: var(--radius-sm);
+          font-family: var(--font-body);
+          font-size: 0.78rem;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .term-queues-save-btn {
+          background: var(--primary);
+          border: 1px solid var(--primary);
+          color: white;
+        }
+
+        .term-queues-save-btn:disabled,
+        .term-queues-cancel-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .term-queues-cancel-btn {
+          background: transparent;
+          border: 1px solid var(--border);
+          color: var(--text-muted);
+        }
+
+        .term-queues-hint {
+          font-size: 0.75rem;
+          color: var(--text-light);
         }
 
         .term-connection-warning {

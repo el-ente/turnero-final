@@ -1,8 +1,8 @@
 import {Turn, TurnStatus, Terminal, TerminalStatus, ServingStrategy, Queue, RatioBasedConfig} from "shared";
-import {FieldPath} from "firebase-admin/firestore";
 import {db} from "../config/firebase-admin";
-import {NotFoundError, ConflictError} from "../utils/errors";
-import {getWaitingTurnsAcrossQueues} from "./queueService";
+import {NotFoundError, ConflictError, ValidationError, ForbiddenError} from "../utils/errors";
+import {getWaitingTurnsAcrossQueues, getQueuesByIds} from "./queueService";
+import {syncServedBy} from "./adminService";
 import {updateTurnStatus} from "./turnService";
 import {toMillis} from "../utils/dates";
 
@@ -75,13 +75,8 @@ async function getNextTurnRatioBased(terminal: Terminal): Promise<Turn | null> {
   const normalQueues: string[] = [];
   const priorityQueues: string[] = [];
 
-  const queueTypeById = new Map<string, string>();
-  if (terminal.activeQueueIds.length > 0) {
-    const snap = await db.collection("queues")
-      .where(FieldPath.documentId(), "in", terminal.activeQueueIds)
-      .get();
-    snap.docs.forEach((d) => queueTypeById.set(d.id, (d.data() as any).type));
-  }
+  const activeQueues = await getQueuesByIds(terminal.activeQueueIds);
+  const queueTypeById = new Map(activeQueues.map((q) => [q.id, q.type]));
 
   for (const queueId of terminal.activeQueueIds) {
     if (queueTypeById.get(queueId) === "priority") {
@@ -144,6 +139,9 @@ export async function callTurn(terminalId: string, turnId: string): Promise<void
     const turn = turnDoc.data() as Turn;
     if (turn.status !== TurnStatus.WAITING) {
       throw new ConflictError(`Turn is not in WAITING status (current: ${turn.status})`);
+    }
+    if (!terminal.activeQueueIds.includes(turn.queueId)) {
+      throw new ConflictError(`Turn's queue is not active on terminal ${terminalId}`);
     }
 
     const queueRef = db.collection("queues").doc(turn.queueId);
@@ -297,4 +295,49 @@ export async function handleNoShow(terminalId: string, turnId: string): Promise<
       currentTurnId: "",
     });
   });
+}
+
+// Firestore "in" caps at 30 values (same assumption as adminService.ts's deleteSector).
+const MAX_QUEUE_IDS = 30;
+
+export async function reassignTerminalQueues(terminalId: string, queueIds: string[]): Promise<Terminal> {
+  if (queueIds.length === 0 || queueIds.length > MAX_QUEUE_IDS) {
+    throw new ValidationError(`queueIds must contain 1 to ${MAX_QUEUE_IDS} ids`);
+  }
+
+  const queues = await getQueuesByIds(queueIds);
+  const foundIds = new Set(queues.map((q) => q.id));
+  if (foundIds.size !== new Set(queueIds).size || queues.some((q) => !q.active)) {
+    throw new ValidationError("All queues must exist and be active");
+  }
+
+  const now = new Date();
+  const {updated, previousQueueIds} = await db.runTransaction(async (transaction) => {
+    const ref = db.collection("terminals").doc(terminalId);
+    const doc = await transaction.get(ref);
+    if (!doc.exists) {
+      throw new NotFoundError(`Terminal ${terminalId} not found`);
+    }
+
+    const terminal = doc.data() as Terminal;
+    if (terminal.currentTurnId) {
+      throw new ConflictError(`Terminal ${terminalId} has a turn in progress`);
+    }
+    // Re-checked here (not just at the controller) against the terminal
+    // snapshot this transaction actually commits against, so a concurrent
+    // admin edit to terminal.sectorIds can't slip a queue through on a
+    // stale read — the only correctness-relevant copy of this check.
+    if (queues.some((q) => !terminal.sectorIds.includes(q.sectorId))) {
+      throw new ForbiddenError("One or more queues are outside this terminal's sectors");
+    }
+
+    transaction.update(ref, {activeQueueIds: queueIds, updatedAt: now});
+    return {
+      updated: {...terminal, activeQueueIds: queueIds, updatedAt: now},
+      previousQueueIds: terminal.activeQueueIds,
+    };
+  });
+
+  await syncServedBy(terminalId, previousQueueIds, queueIds);
+  return updated;
 }

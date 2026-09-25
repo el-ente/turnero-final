@@ -283,7 +283,7 @@ export async function deleteTerminal(terminalId: string) {
 
 // ─── Helpers ───
 
-async function syncServedBy(terminalId: string, oldQueueIds: string[], newQueueIds: string[]) {
+export async function syncServedBy(terminalId: string, oldQueueIds: string[], newQueueIds: string[]) {
   const removed = oldQueueIds.filter((id) => !newQueueIds.includes(id));
   const added = newQueueIds.filter((id) => !oldQueueIds.includes(id));
   const batch = db.batch();

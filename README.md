@@ -158,6 +158,13 @@ POST /startTurn { terminalId, turnId }
 POST /finishTurn { terminalId, turnId }
 POST /noShow { terminalId, turnId }
 POST /recallTurn { terminalId, turnId }
+
+POST /reassignTerminalQueues { terminalId, queueIds }
+  → Terminal
+  # Autoservicio: el cajero cambia las colas activas de SU PROPIA terminal sin pasar
+  # por Admin. Solo si la terminal no tiene turno en curso (409 si lo tiene). Cada
+  # queueId debe pertenecer a un sector ya asignado a la terminal (terminal.sectorIds),
+  # no alcanza con que el cajero tenga acceso al sector — 403 si no.
 ```
 
 ### Admin
@@ -225,7 +232,7 @@ pnpm -F functions test:watch
 pnpm -F functions test:coverage
 ```
 
-**106 tests** covering turnService, queueService, terminalService, statsService, adminService, y la capa de auth (middleware + gating de cada endpoint protegido).
+**136 tests** covering turnService, queueService, terminalService, statsService, adminService, y la capa de auth (middleware + gating de cada endpoint protegido).
 
 ### Testing Manual
 

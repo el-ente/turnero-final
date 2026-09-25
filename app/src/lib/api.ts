@@ -106,6 +106,10 @@ export async function noShowTurn(terminalId: string, turnId: string): Promise<vo
   return callFunction<void>("noShow", "POST", { terminalId, turnId });
 }
 
+export async function apiReassignTerminalQueues(terminalId: string, queueIds: string[]): Promise<Terminal> {
+  return callFunction<Terminal>("reassignTerminalQueues", "POST", { terminalId, queueIds });
+}
+
 // Admin API
 export async function getQueueStats(queueId: string) {
   return callFunction("getQueueStats", "GET", undefined, { queueId });

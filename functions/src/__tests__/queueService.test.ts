@@ -1,4 +1,4 @@
-import {getWaitingTurns, getWaitingTurnsAcrossQueues} from "../services/queueService";
+import {getWaitingTurns, getWaitingTurnsAcrossQueues, getQueuesByIds} from "../services/queueService";
 import {db} from "../config/firebase-admin";
 import {TurnStatus} from "shared";
 
@@ -108,6 +108,31 @@ describe("Queue Service", () => {
 
       const turns = await getWaitingTurnsAcrossQueues(["queue-1", "queue-2"]);
       expect(Array.isArray(turns)).toBe(true);
+    });
+  });
+
+  describe("getQueuesByIds", () => {
+    it("should handle empty id list without querying Firestore", async () => {
+      const queues = await getQueuesByIds([]);
+      expect(queues.length).toBe(0);
+      expect(db.collection).not.toHaveBeenCalled();
+    });
+
+    it("should fetch queues by id in a single batched call", async () => {
+      const whereMock = jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue({
+          docs: [
+            {data: () => ({id: "queue-1", sectorId: "sector-1", active: true})},
+            {data: () => ({id: "queue-2", sectorId: "sector-1", active: false})},
+          ],
+        }),
+      });
+      (db.collection as jest.Mock).mockReturnValue({where: whereMock});
+
+      const queues = await getQueuesByIds(["queue-1", "queue-2"]);
+
+      expect(whereMock).toHaveBeenCalledTimes(1);
+      expect(queues).toHaveLength(2);
     });
   });
 });

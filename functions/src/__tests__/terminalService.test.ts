@@ -1,12 +1,17 @@
-import {getNextTurn, callTurn, startTurn, finishTurn, recallTurn, handleNoShow, nextRatioCounterState} from "../services/terminalService";
+import {
+  getNextTurn, callTurn, startTurn, finishTurn, recallTurn, handleNoShow, nextRatioCounterState,
+  reassignTerminalQueues,
+} from "../services/terminalService";
 import {db} from "../config/firebase-admin";
-import {Terminal, Turn, TurnStatus, ServingStrategy} from "shared";
-import {NotFoundError, ConflictError} from "../utils/errors";
+import {Terminal, Turn, TurnStatus, ServingStrategy, Queue} from "shared";
+import {NotFoundError, ConflictError, ValidationError, ForbiddenError} from "../utils/errors";
 import {mockRunTransaction} from "./helpers";
-import {getWaitingTurnsAcrossQueues} from "../services/queueService";
+import {getWaitingTurnsAcrossQueues, getQueuesByIds} from "../services/queueService";
+import {syncServedBy} from "../services/adminService";
 
 jest.mock("../config/firebase-admin");
 jest.mock("../services/queueService");
+jest.mock("../services/adminService");
 
 // Shared by callTurn/handleNoShow tests: transaction.get uses db.collection(...).doc(...)
 // refs as keys, so db.collection must resolve to something with a .doc() before the
@@ -118,18 +123,6 @@ describe("Terminal Service", () => {
         updatedAt: new Date(),
       };
 
-      const whereMock = jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          docs: [
-            {id: "q1", data: () => ({type: "normal"})},
-            {id: "q2", data: () => ({type: "priority"})},
-            {id: "q3", data: () => ({type: "normal"})},
-            {id: "q4", data: () => ({type: "normal"})},
-            {id: "q5", data: () => ({type: "priority"})},
-          ],
-        }),
-      });
-
       (db.collection as jest.Mock).mockImplementation((name: string) => {
         if (name === "terminals") {
           return {
@@ -138,27 +131,26 @@ describe("Terminal Service", () => {
             }),
           };
         }
-        if (name === "queues") {
-          return {where: whereMock};
-        }
         return {doc: jest.fn().mockReturnValue({get: jest.fn()})};
       });
+      (getQueuesByIds as jest.Mock).mockResolvedValue([
+        {id: "q1", type: "normal"},
+        {id: "q2", type: "priority"},
+        {id: "q3", type: "normal"},
+        {id: "q4", type: "normal"},
+        {id: "q5", type: "priority"},
+      ]);
       (getWaitingTurnsAcrossQueues as jest.Mock).mockResolvedValue([]);
 
       await getNextTurn("terminal-1");
 
-      expect(whereMock).toHaveBeenCalledTimes(1);
+      expect(getQueuesByIds).toHaveBeenCalledTimes(1);
+      expect(getQueuesByIds).toHaveBeenCalledWith(["q1", "q2", "q3", "q4", "q5"]);
     });
   });
 
   describe("getNextTurnRatioBased (via getNextTurn)", () => {
     function mockTerminalAndQueues(terminal: Terminal, queueDocs: {id: string; type: string}[]) {
-      const whereMock = jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          docs: queueDocs.map((q) => ({id: q.id, data: () => ({type: q.type})})),
-        }),
-      });
-
       (db.collection as jest.Mock).mockImplementation((name: string) => {
         if (name === "terminals") {
           return {
@@ -167,11 +159,11 @@ describe("Terminal Service", () => {
             }),
           };
         }
-        if (name === "queues") {
-          return {where: whereMock};
-        }
         return {doc: jest.fn().mockReturnValue({get: jest.fn()})};
       });
+      (getQueuesByIds as jest.Mock).mockResolvedValue(
+        queueDocs.map((q) => ({id: q.id, type: q.type}))
+      );
     }
 
     function priorityPreferredTerminal(): Terminal {
@@ -438,6 +430,38 @@ describe("Terminal Service", () => {
       const transaction = mockRunTransaction();
       transaction.get
         .mockResolvedValueOnce({exists: true, data: () => ({})}) // terminal
+        .mockResolvedValueOnce({exists: true, data: () => mockTurn}); // turn
+
+      await expect(callTurn("terminal-1", "turn-1")).rejects.toThrow(ConflictError);
+      expect(transaction.update).not.toHaveBeenCalled();
+    });
+
+    it("should throw ConflictError if the turn's queue is not in the terminal's activeQueueIds", async () => {
+      mockCollectionDocs();
+      const mockTerminal: Terminal = {
+        id: "terminal-1",
+        name: "Terminal 1",
+        sectorIds: ["sector-1"],
+        activeQueueIds: ["queue-1"],
+        servingStrategy: ServingStrategy.FIFO_ACROSS_QUEUES,
+        strategyConfig: {strategy: ServingStrategy.FIFO_ACROSS_QUEUES},
+        status: "available",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const mockTurn: Turn = {
+        id: "turn-1",
+        memberNumber: 1,
+        queueId: "queue-stale",
+        queuedAt: new Date(),
+        status: TurnStatus.WAITING,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: new Date(),
+      };
+      const transaction = mockRunTransaction();
+      transaction.get
+        .mockResolvedValueOnce({exists: true, data: () => mockTerminal}) // terminal
         .mockResolvedValueOnce({exists: true, data: () => mockTurn}); // turn
 
       await expect(callTurn("terminal-1", "turn-1")).rejects.toThrow(ConflictError);
@@ -850,6 +874,104 @@ describe("Terminal Service", () => {
 
       expect(docUpdateSpy).not.toHaveBeenCalled();
       expect(transaction.update).toHaveBeenCalled();
+    });
+  });
+
+  describe("reassignTerminalQueues", () => {
+    it("throws ValidationError when queueIds is empty", async () => {
+      await expect(reassignTerminalQueues("terminal-1", [])).rejects.toThrow(ValidationError);
+    });
+
+    it("throws ValidationError when a requested queue doesn't exist", async () => {
+      (getQueuesByIds as jest.Mock).mockResolvedValue([{id: "queue-1", active: true} as Queue]);
+
+      await expect(reassignTerminalQueues("terminal-1", ["queue-1", "queue-2"])).rejects.toThrow(ValidationError);
+    });
+
+    it("throws ValidationError when a requested queue is inactive", async () => {
+      (getQueuesByIds as jest.Mock).mockResolvedValue([{id: "queue-1", active: false} as Queue]);
+
+      await expect(reassignTerminalQueues("terminal-1", ["queue-1"])).rejects.toThrow(ValidationError);
+    });
+
+    it("throws NotFoundError when the terminal doesn't exist", async () => {
+      mockCollectionDocs();
+      (getQueuesByIds as jest.Mock).mockResolvedValue([{id: "queue-1", active: true} as Queue]);
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValueOnce({exists: false});
+
+      await expect(reassignTerminalQueues("terminal-1", ["queue-1"])).rejects.toThrow(NotFoundError);
+    });
+
+    it("throws ConflictError when the terminal has a turn in progress", async () => {
+      mockCollectionDocs();
+      (getQueuesByIds as jest.Mock).mockResolvedValue([{id: "queue-1", active: true} as Queue]);
+      const mockTerminal: Terminal = {
+        id: "terminal-1",
+        name: "Terminal 1",
+        sectorIds: ["sector-1"],
+        activeQueueIds: ["queue-old"],
+        servingStrategy: ServingStrategy.FIFO_ACROSS_QUEUES,
+        strategyConfig: {strategy: ServingStrategy.FIFO_ACROSS_QUEUES},
+        status: "available",
+        currentTurnId: "turn-in-progress",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValueOnce({exists: true, data: () => mockTerminal});
+
+      await expect(reassignTerminalQueues("terminal-1", ["queue-1"])).rejects.toThrow(ConflictError);
+      expect(transaction.update).not.toHaveBeenCalled();
+    });
+
+    it("throws ForbiddenError when a queue is outside the terminal's sectors, even re-read fresh inside the transaction", async () => {
+      mockCollectionDocs();
+      (getQueuesByIds as jest.Mock).mockResolvedValue([{id: "queue-9", active: true, sectorId: "sector-other"} as Queue]);
+      const mockTerminal: Terminal = {
+        id: "terminal-1",
+        name: "Terminal 1",
+        sectorIds: ["sector-1"],
+        activeQueueIds: ["queue-old"],
+        servingStrategy: ServingStrategy.FIFO_ACROSS_QUEUES,
+        strategyConfig: {strategy: ServingStrategy.FIFO_ACROSS_QUEUES},
+        status: "available",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValueOnce({exists: true, data: () => mockTerminal});
+
+      await expect(reassignTerminalQueues("terminal-1", ["queue-9"])).rejects.toThrow(ForbiddenError);
+      expect(transaction.update).not.toHaveBeenCalled();
+      expect(syncServedBy).not.toHaveBeenCalled();
+    });
+
+    it("updates activeQueueIds and syncs servedBy on success", async () => {
+      mockCollectionDocs();
+      (getQueuesByIds as jest.Mock).mockResolvedValue([{id: "queue-2", active: true, sectorId: "sector-1"} as Queue]);
+      const mockTerminal: Terminal = {
+        id: "terminal-1",
+        name: "Terminal 1",
+        sectorIds: ["sector-1"],
+        activeQueueIds: ["queue-1"],
+        servingStrategy: ServingStrategy.FIFO_ACROSS_QUEUES,
+        strategyConfig: {strategy: ServingStrategy.FIFO_ACROSS_QUEUES},
+        status: "available",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValueOnce({exists: true, data: () => mockTerminal});
+
+      const result = await reassignTerminalQueues("terminal-1", ["queue-2"]);
+
+      expect(transaction.update).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({activeQueueIds: ["queue-2"]})
+      );
+      expect(syncServedBy).toHaveBeenCalledWith("terminal-1", ["queue-1"], ["queue-2"]);
+      expect(result.activeQueueIds).toEqual(["queue-2"]);
     });
   });
 });
