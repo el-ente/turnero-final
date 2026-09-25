@@ -8,6 +8,7 @@ import { useAuth } from "../contexts/useAuth";
 
 export function TerminalSelector() {
   const [allTerminals, setAllTerminals] = useState<Terminal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
   const navigate = useNavigate();
   const { appUser } = useAuth();
@@ -19,10 +20,12 @@ export function TerminalSelector() {
         setConnectionError(false);
         const list = snapshot.docs.map((doc) => doc.data() as Terminal);
         setAllTerminals(list.sort((a, b) => a.name.localeCompare(b.name)));
+        setLoading(false);
       },
       (error) => {
         console.error("TerminalSelector terminals listener:", error);
         setConnectionError(true);
+        setLoading(false);
       }
     );
     return unsubscribe;
@@ -41,7 +44,9 @@ export function TerminalSelector() {
           <div className="tsel-error">No se pudo conectar. La lista de terminales puede estar desactualizada.</div>
         )}
 
-        {terminals.length === 0 ? (
+        {loading ? (
+          <div className="tsel-empty">Cargando terminales...</div>
+        ) : terminals.length === 0 ? (
           <div className="tsel-empty">
             {allTerminals.length === 0
               ? "No hay terminales configuradas"

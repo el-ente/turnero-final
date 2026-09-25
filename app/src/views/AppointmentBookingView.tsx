@@ -54,6 +54,8 @@ export function AppointmentBookingView() {
 
 function BookAppointment({ onBooked }: { onBooked: (appt: Appointment, memberNumber: number) => void }) {
   const [services, setServices] = useState<AppointmentService[]>([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [servicesError, setServicesError] = useState(false);
   const [serviceId, setServiceId] = useState("");
   const [slots, setSlots] = useState<AppointmentSlot[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
@@ -65,20 +67,26 @@ function BookAppointment({ onBooked }: { onBooked: (appt: Appointment, memberNum
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDocs(collection(db, "appointmentServices"));
-        const list = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() }) as AppointmentService)
-          .filter((s) => s.active !== false);
-        setServices(list);
-        if (list.length > 0) setServiceId(list[0].id);
-      } catch {
-        setError("Error cargando servicios disponibles");
-      }
-    })();
+  const loadServices = useCallback(async () => {
+    setLoadingServices(true);
+    setServicesError(false);
+    try {
+      const snap = await getDocs(collection(db, "appointmentServices"));
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as AppointmentService)
+        .filter((s) => s.active !== false);
+      setServices(list);
+      if (list.length > 0) setServiceId(list[0].id);
+    } catch {
+      setServicesError(true);
+    } finally {
+      setLoadingServices(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadServices();
+  }, [loadServices]);
 
   const loadSlots = useCallback(async (svcId: string) => {
     if (!svcId) return;
@@ -141,7 +149,14 @@ function BookAppointment({ onBooked }: { onBooked: (appt: Appointment, memberNum
           <p className="agb-subtitle">Elegí un servicio, un horario, y dejá tus datos</p>
         </div>
 
-        {services.length === 0 ? (
+        {loadingServices ? (
+          <div className="agb-empty">Cargando servicios...</div>
+        ) : servicesError ? (
+          <div className="agb-empty">
+            No pudimos cargar los servicios disponibles.
+            <button className="agb-submit" onClick={loadServices}>Reintentar</button>
+          </div>
+        ) : services.length === 0 ? (
           <div className="agb-empty">No hay servicios disponibles para agendar</div>
         ) : (
           <>

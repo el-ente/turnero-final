@@ -31,6 +31,7 @@ function playChime() {
 export function PublicDisplay() {
   const [calledTurns, setCalledTurns] = useState<Turn[]>([]);
   const [terminals, setTerminals] = useState<Terminal[]>([]);
+  const [terminalsLoading, setTerminalsLoading] = useState(true);
   const [sectorNames, setSectorNames] = useState<Record<string, string>>({});
   const [time, setTime] = useState(new Date());
 
@@ -66,10 +67,12 @@ export function PublicDisplay() {
       (snapshot) => {
         setListenerError("terminals", false);
         setTerminals(snapshot.docs.map((d) => d.data() as Terminal));
+        setTerminalsLoading(false);
       },
       (error) => {
         console.error("PublicDisplay terminals listener:", error);
         setListenerError("terminals", true);
+        setTerminalsLoading(false);
       }
     );
     return unsubscribe;
@@ -180,7 +183,9 @@ export function PublicDisplay() {
       </div>
 
       <div className="display-body">
-        {activeTerminals.length === 0 ? (
+        {terminalsLoading ? (
+          <div className="display-empty">Cargando...</div>
+        ) : activeTerminals.length === 0 ? (
           <div className="display-empty">Sin terminales activas</div>
         ) : (
           <div className="counter-grid">

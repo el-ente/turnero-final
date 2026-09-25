@@ -40,6 +40,7 @@ function formatDateLabel(dateStr: string): string {
 export function AppointmentAgendaView() {
   const [date, setDate] = useState(() => formatDate(new Date()));
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(true);
   const [services, setServices] = useState<Record<string, AppointmentService>>({});
   const [serviceFilter, setServiceFilter] = useState<string>("");
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -57,16 +58,19 @@ export function AppointmentAgendaView() {
   }, []);
 
   useEffect(() => {
+    setLoadingAppointments(true);
     const q = query(collection(db, "appointments"), where("date", "==", date));
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
         setHasConnectionError(false);
         setAppointments(snapshot.docs.map((d) => d.data() as Appointment));
+        setLoadingAppointments(false);
       },
       (error) => {
         console.error("AppointmentAgendaView listener:", error);
         setHasConnectionError(true);
+        setLoadingAppointments(false);
       }
     );
     return unsubscribe;
@@ -144,7 +148,9 @@ export function AppointmentAgendaView() {
           <span>Acciones</span>
         </div>
 
-        {visible.length === 0 ? (
+        {loadingAppointments ? (
+          <div className="aga-empty">Cargando citas...</div>
+        ) : visible.length === 0 ? (
           <div className="aga-empty">No hay citas para este día</div>
         ) : (
           visible.map((appt) => {
