@@ -18,11 +18,14 @@ function validateAvailabilityRules(rules: AvailabilityRule[]) {
 
 // ─── Appointment Services ───
 
+const DEFAULT_BOOKING_HORIZON_DAYS = 14;
+
 export async function createAppointmentService(data: {
   name: string;
   durationMinutes: number;
   capacityPerSlot: number;
   availabilityRules?: AvailabilityRule[];
+  bookingHorizonDays?: number;
 }): Promise<AppointmentService> {
   if (!data.name) throw new ValidationError("name is required");
   if (!Number.isInteger(data.durationMinutes) || data.durationMinutes <= 0) {
@@ -30,6 +33,10 @@ export async function createAppointmentService(data: {
   }
   if (!Number.isInteger(data.capacityPerSlot) || data.capacityPerSlot <= 0) {
     throw new ValidationError("capacityPerSlot must be a positive integer");
+  }
+  if (data.bookingHorizonDays !== undefined &&
+      (!Number.isInteger(data.bookingHorizonDays) || data.bookingHorizonDays <= 0)) {
+    throw new ValidationError("bookingHorizonDays must be a positive integer");
   }
   const availabilityRules = data.availabilityRules || [];
   validateAvailabilityRules(availabilityRules);
@@ -42,6 +49,7 @@ export async function createAppointmentService(data: {
     durationMinutes: data.durationMinutes,
     capacityPerSlot: data.capacityPerSlot,
     availabilityRules,
+    bookingHorizonDays: data.bookingHorizonDays || DEFAULT_BOOKING_HORIZON_DAYS,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -65,12 +73,17 @@ export async function updateAppointmentService(
   if (data.availabilityRules !== undefined) {
     validateAvailabilityRules(data.availabilityRules as AvailabilityRule[]);
   }
+  if (data.bookingHorizonDays !== undefined &&
+      (!Number.isInteger(data.bookingHorizonDays) || (data.bookingHorizonDays as number) <= 0)) {
+    throw new ValidationError("bookingHorizonDays must be a positive integer");
+  }
 
   const updateData: Record<string, unknown> = {updatedAt: new Date()};
   if (data.name !== undefined) updateData.name = data.name;
   if (data.durationMinutes !== undefined) updateData.durationMinutes = data.durationMinutes;
   if (data.capacityPerSlot !== undefined) updateData.capacityPerSlot = data.capacityPerSlot;
   if (data.availabilityRules !== undefined) updateData.availabilityRules = data.availabilityRules;
+  if (data.bookingHorizonDays !== undefined) updateData.bookingHorizonDays = data.bookingHorizonDays;
   if (data.active !== undefined) updateData.active = data.active;
 
   await ref.update(updateData);

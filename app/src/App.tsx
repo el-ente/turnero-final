@@ -4,6 +4,8 @@ import { UserRole } from 'shared'
 import { TotemView } from './views/TotemView'
 import { PublicDisplay } from './views/PublicDisplay'
 import { WebTicketView } from './views/WebTicketView'
+import { AppointmentBookingView } from './views/AppointmentBookingView'
+import { AppointmentScreenView } from './views/AppointmentScreenView'
 import { TicketMark } from './components/TicketMark'
 import { RequireAuth } from './components/RequireAuth'
 import { AuthProvider } from './contexts/AuthContext'
@@ -46,6 +48,14 @@ function App() {
           {/* Mi Turno / Login are public-facing, no staff nav */}
           <Route path="/mi-turno" element={<WebTicketView />} />
           <Route path="/mi-turno/:turnId" element={<WebTicketView />} />
+
+          {/* Agenda module — independent of Turn/Queue/Terminal, see
+              docs/turnos-agendados-spec-2026-09-25.md. Public booking/
+              self-service and its own announcement screen, no staff nav. */}
+          <Route path="/agenda" element={<AppointmentBookingView />} />
+          <Route path="/agenda/pantalla" element={<AppointmentScreenView />} />
+          <Route path="/agenda/:appointmentId" element={<AppointmentBookingView />} />
+
           <Route path="/login" element={
             <Suspense fallback={<RouteFallback />}>
               <LoginView />
@@ -64,6 +74,8 @@ function App() {
                   <li><NavLink to="/" end>Totem</NavLink></li>
                   <li><NavLink to="/mi-turno">Mi Turno</NavLink></li>
                   <li><NavLink to="/display">Pantalla Pública</NavLink></li>
+                  <li><NavLink to="/agenda">Agendar Turno</NavLink></li>
+                  <li><NavLink to="/agenda/pantalla">Pantalla Agenda</NavLink></li>
                   <li><NavLink to="/terminal">Terminal</NavLink></li>
                   <li><NavLink to="/admin">Admin</NavLink></li>
                 </ul>

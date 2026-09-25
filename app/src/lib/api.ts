@@ -58,7 +58,7 @@ export async function callFunction<T>(
   return (await response.json()) as T;
 }
 
-import type { Turn, Sector, Queue, Terminal, AppUser, UserRole, UserStatus } from "shared";
+import type { Turn, Sector, Queue, Terminal, AppUser, UserRole, UserStatus, Appointment, AppointmentService, AppointmentBlock } from "shared";
 
 // Turn API
 export async function createTurn(
@@ -188,4 +188,132 @@ export async function apiUpdateUserRole(
 
 export async function apiDeleteUser(userId: string) {
   return callFunction<void>("deleteUser", "DELETE", undefined, { userId });
+}
+
+// ─── Agenda (independent appointment-scheduling module) ───
+
+export interface AppointmentSlot {
+  date: string;
+  startTime: string;
+  remainingCapacity: number;
+}
+
+// Public — client booking / self-service
+export async function getAvailableSlots(serviceId: string, dateFrom: string, dateTo: string) {
+  return callFunction<AppointmentSlot[]>("getAvailableSlots", "GET", undefined, { serviceId, dateFrom, dateTo });
+}
+
+export async function createAppointment(data: {
+  serviceId: string;
+  date: string;
+  startTime: string;
+  memberNumber: number;
+  contactName: string;
+  contact?: string;
+}) {
+  return callFunction<Appointment>("createAppointment", "POST", data);
+}
+
+export async function getAppointment(appointmentId: string, memberNumber: number) {
+  return callFunction<Appointment>("getAppointment", "GET", undefined, {
+    appointmentId,
+    memberNumber: String(memberNumber),
+  });
+}
+
+export async function cancelAppointment(appointmentId: string, memberNumber: number) {
+  return callFunction<void>("cancelAppointment", "POST", { appointmentId, memberNumber });
+}
+
+export async function rescheduleAppointment(
+  appointmentId: string,
+  memberNumber: number,
+  newDate: string,
+  newStartTime: string
+) {
+  return callFunction<Appointment>("rescheduleAppointment", "POST", { appointmentId, memberNumber, newDate, newStartTime });
+}
+
+// Staff — "Agenda del día"
+export async function callAppointment(appointmentId: string) {
+  return callFunction<Appointment>("callAppointment", "POST", { appointmentId });
+}
+
+export async function recallAppointment(appointmentId: string) {
+  return callFunction<Appointment>("recallAppointment", "POST", { appointmentId });
+}
+
+export async function startAppointment(appointmentId: string) {
+  return callFunction<Appointment>("startAppointment", "POST", { appointmentId });
+}
+
+export async function finishAppointment(appointmentId: string) {
+  return callFunction<Appointment>("finishAppointment", "POST", { appointmentId });
+}
+
+export async function noShowAppointment(appointmentId: string) {
+  return callFunction<Appointment>("noShowAppointment", "POST", { appointmentId });
+}
+
+export async function getAppointmentsByDate(date: string, serviceId?: string) {
+  return callFunction<Appointment[]>(
+    "getAppointmentsByDate",
+    "GET",
+    undefined,
+    serviceId ? { date, serviceId } : { date }
+  );
+}
+
+// Admin — Servicio / Bloqueo config
+export async function apiCreateAppointmentService(data: {
+  name: string;
+  durationMinutes: number;
+  capacityPerSlot: number;
+  availabilityRules?: AppointmentService["availabilityRules"];
+}) {
+  return callFunction<AppointmentService>("createAppointmentService", "POST", data);
+}
+
+export async function apiListAppointmentServices() {
+  return callFunction<AppointmentService[]>("listAppointmentServices", "GET");
+}
+
+export async function apiUpdateAppointmentService(serviceId: string, data: Partial<AppointmentService>) {
+  return callFunction<AppointmentService>("updateAppointmentService", "PUT", data, { serviceId });
+}
+
+export async function apiCreateAppointmentBlock(data: {
+  serviceId?: string | null;
+  date: string;
+  startTime?: string;
+  endTime?: string;
+  reason?: string;
+}) {
+  return callFunction<AppointmentBlock>("createAppointmentBlock", "POST", data);
+}
+
+export async function apiListAppointmentBlocks() {
+  return callFunction<AppointmentBlock[]>("listAppointmentBlocks", "GET");
+}
+
+export async function apiDeleteAppointmentBlock(blockId: string) {
+  return callFunction<void>("deleteAppointmentBlock", "DELETE", undefined, { blockId });
+}
+
+export async function apiPreviewAppointmentBlockImpact(params: {
+  serviceId?: string | null;
+  date: string;
+  startTime?: string;
+  endTime?: string;
+}) {
+  const query: Record<string, string> = { date: params.date };
+  if (params.serviceId) query.serviceId = params.serviceId;
+  if (params.startTime) query.startTime = params.startTime;
+  if (params.endTime) query.endTime = params.endTime;
+  return callFunction<{ count: number; appointments: Appointment[] }>(
+    "previewAppointmentBlockImpact",
+    "GET",
+    undefined,
+    query
+  );
 }

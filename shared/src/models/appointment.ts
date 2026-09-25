@@ -34,6 +34,7 @@ export interface AppointmentService {
   durationMinutes: number;
   capacityPerSlot: number;
   availabilityRules: AvailabilityRule[];
+  bookingHorizonDays: number; // how many days ahead a client may book, e.g. 14
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,5 +1,5 @@
 import {AvailabilityRule, AppointmentBlock} from "shared";
-import {dayOfWeekInArgentina} from "../utils/argentinaTime";
+import {dayOfWeekInArgentina, todayInArgentina} from "../utils/argentinaTime";
 
 // Pure date/slot math, deliberately free of Firestore — easy to unit test
 // without mocking anything. appointmentService.ts wraps this with the
@@ -16,6 +16,12 @@ export interface SlotAvailability extends CandidateSlot {
 
 export function slotKey(slot: CandidateSlot): string {
   return `${slot.date}T${slot.startTime}`;
+}
+
+// The furthest date a client may book, given a service's bookingHorizonDays.
+// Dates are plain "YYYY-MM-DD" strings, which sort/compare correctly as text.
+export function maxBookableDate(bookingHorizonDays: number): string {
+  return addDays(todayInArgentina(), bookingHorizonDays);
 }
 
 export function computeCandidateSlots(

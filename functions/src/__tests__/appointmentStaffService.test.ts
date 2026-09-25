@@ -9,7 +9,7 @@ import {mockRunTransaction} from "./helpers";
 jest.mock("../config/firebase-admin");
 
 function chainable(overrides: Record<string, unknown> = {}) {
-  const obj: any = {id: "appt-1", ...overrides};
+  const obj: any = {id: "appt-1", delete: jest.fn().mockResolvedValue(undefined), ...overrides};
   obj.doc = jest.fn().mockReturnValue(obj);
   obj.where = jest.fn().mockReturnValue(obj);
   obj.orderBy = jest.fn().mockReturnValue(obj);

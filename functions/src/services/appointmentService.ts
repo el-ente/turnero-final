@@ -5,7 +5,9 @@ import {
 import {db} from "../config/firebase-admin";
 import {NotFoundError, ConflictError, ValidationError, ForbiddenError} from "../utils/errors";
 import {isPastInArgentina} from "../utils/argentinaTime";
-import {computeCandidateSlots, applyBlocks, subtractCounts, slotKey, SlotAvailability} from "./appointmentAvailability";
+import {
+  computeCandidateSlots, applyBlocks, subtractCounts, slotKey, maxBookableDate, SlotAvailability,
+} from "./appointmentAvailability";
 
 async function getActiveServiceOrThrow(serviceId: string): Promise<AppointmentServiceModel> {
   const doc = await db.collection("appointmentServices").doc(serviceId).get();
@@ -34,10 +36,18 @@ export async function getAvailableSlots(
   }
 
   const service = await getActiveServiceOrThrow(serviceId);
-  const candidates = computeCandidateSlots(service.availabilityRules, service.durationMinutes, dateFrom, dateTo);
+
+  // Clamp to the service's own booking horizon regardless of what the
+  // caller asked for — this is the only enforcement of that limit.
+  const clampedDateTo = dateTo < maxBookableDate(service.bookingHorizonDays) ?
+    dateTo :
+    maxBookableDate(service.bookingHorizonDays);
+  if (dateFrom > clampedDateTo) return [];
+
+  const candidates = computeCandidateSlots(service.availabilityRules, service.durationMinutes, dateFrom, clampedDateTo);
 
   const blocksSnap = await db.collection("appointmentBlocks")
-    .where("date", ">=", dateFrom).where("date", "<=", dateTo).get();
+    .where("date", ">=", dateFrom).where("date", "<=", clampedDateTo).get();
   const blocks = blocksSnap.docs.map((d) => d.data() as AppointmentBlock);
 
   const open = applyBlocks(candidates, blocks.filter((b) => b.serviceId === null || b.serviceId === serviceId))
@@ -45,7 +55,7 @@ export async function getAvailableSlots(
 
   const activeSnap = await db.collection("appointments")
     .where("serviceId", "==", serviceId)
-    .where("date", ">=", dateFrom).where("date", "<=", dateTo)
+    .where("date", ">=", dateFrom).where("date", "<=", clampedDateTo)
     .where("status", "in", ACTIVE_APPOINTMENT_STATUSES)
     .get();
 
@@ -84,6 +94,9 @@ export async function createAppointment(data: {
     if (!serviceDoc.exists) throw new NotFoundError(`Appointment service ${serviceId} not found`);
     const service = serviceDoc.data() as AppointmentServiceModel;
     if (!service.active) throw new ConflictError(`Appointment service ${serviceId} is not active`);
+    if (date > maxBookableDate(service.bookingHorizonDays)) {
+      throw new ValidationError("Requested date is beyond this service's booking horizon");
+    }
 
     const candidates = computeCandidateSlots(service.availabilityRules, service.durationMinutes, date, date);
     if (!candidates.some((c) => c.startTime === startTime)) {
@@ -197,6 +210,9 @@ export async function rescheduleAppointment(
     if (!serviceDoc.exists) throw new NotFoundError(`Appointment service ${appointment.serviceId} not found`);
     const service = serviceDoc.data() as AppointmentServiceModel;
     if (!service.active) throw new ConflictError(`Appointment service ${appointment.serviceId} is not active`);
+    if (newDate > maxBookableDate(service.bookingHorizonDays)) {
+      throw new ValidationError("Requested date is beyond this service's booking horizon");
+    }
 
     const candidates = computeCandidateSlots(service.availabilityRules, service.durationMinutes, newDate, newDate);
     if (!candidates.some((c) => c.startTime === newStartTime)) {

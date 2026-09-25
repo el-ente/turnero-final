@@ -68,7 +68,11 @@ export async function startAppointment(appointmentId: string): Promise<Appointme
     throw new ConflictError(`Appointment is not in LLAMADA status (current: ${appointment.status})`);
   }
   const attendingAt = new Date();
-  await db.collection("appointments").doc(appointmentId).update({status: AppointmentStatus.ATENDIENDO, attendingAt});
+  await Promise.all([
+    db.collection("appointments").doc(appointmentId).update({status: AppointmentStatus.ATENDIENDO, attendingAt}),
+    // Person showed up — the public screen no longer needs to announce them.
+    db.collection("appointmentCalls").doc(appointmentId).delete(),
+  ]);
   return {...appointment, status: AppointmentStatus.ATENDIENDO, attendingAt};
 }
 
@@ -89,7 +93,10 @@ export async function noShowAppointment(appointmentId: string): Promise<Appointm
   if (appointment.status !== AppointmentStatus.LLAMADA) {
     throw new ConflictError(`Appointment is not in LLAMADA status (current: ${appointment.status})`);
   }
-  await db.collection("appointments").doc(appointmentId).update({status: AppointmentStatus.NO_SHOW});
+  await Promise.all([
+    db.collection("appointments").doc(appointmentId).update({status: AppointmentStatus.NO_SHOW}),
+    db.collection("appointmentCalls").doc(appointmentId).delete(),
+  ]);
   return {...appointment, status: AppointmentStatus.NO_SHOW};
 }
 

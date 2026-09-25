@@ -16,6 +16,7 @@ function chainable(overrides: Record<string, unknown> = {}) {
 const activeService = {
   id: "svc-1", name: "Trámite", active: true, durationMinutes: 30, capacityPerSlot: 1,
   availabilityRules: [{daysOfWeek: [1], startTime: "09:00", endTime: "10:00"}], // Monday
+  bookingHorizonDays: 60,
 };
 
 describe("appointmentService", () => {
@@ -58,6 +59,14 @@ describe("appointmentService", () => {
     it("rejects when the service does not exist", async () => {
       const transaction = mockRunTransaction();
       transaction.get.mockResolvedValueOnce({exists: false});
+
+      await expect(createAppointment(baseInput)).rejects.toThrow();
+      expect(transaction.set).not.toHaveBeenCalled();
+    });
+
+    it("rejects a date beyond the service's booking horizon", async () => {
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValueOnce({exists: true, data: () => ({...activeService, bookingHorizonDays: 1})});
 
       await expect(createAppointment(baseInput)).rejects.toThrow();
       expect(transaction.set).not.toHaveBeenCalled();
