@@ -1,8 +1,9 @@
 /**
  * Turn lifecycle: waiting -> called -> attending -> finished, or cancelled.
  * On no-show, terminalService.handleNoShow requeues the turn (back to
- * waiting) or cancels it once reenqueueConfig.maxAttempts is exhausted —
- * it never sets NO_SHOW. NO_SHOW is currently unused; no code path writes it.
+ * waiting) while reenqueueConfig.maxAttempts allows it, then marks it
+ * NO_SHOW once exhausted — kept distinct from CANCELLED, which only
+ * customer-initiated cancellation (turnService.cancelTurn) writes.
  */
 export const TurnStatus = {
   WAITING: "waiting",

@@ -284,9 +284,8 @@ export async function handleNoShow(terminalId: string, turnId: string): Promise<
         lastRequeueAt: new Date(),
       });
     } else {
-      // Cancel the turn
       transaction.update(turnRef, {
-        status: TurnStatus.CANCELLED,
+        status: TurnStatus.NO_SHOW,
       });
     }
 

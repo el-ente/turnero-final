@@ -827,7 +827,7 @@ describe("Terminal Service", () => {
       expect(queuedAt.getTime()).toBeGreaterThanOrEqual(before);
     });
 
-    it("should cancel the turn when maxAttempts is reached", async () => {
+    it("should mark the turn as no-show when maxAttempts is reached", async () => {
       mockCollectionDocs();
       const mockTurn: Turn = {
         id: "turn-1",
@@ -846,7 +846,7 @@ describe("Terminal Service", () => {
 
       expect(transaction.update).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({status: TurnStatus.CANCELLED})
+        expect.objectContaining({status: TurnStatus.NO_SHOW})
       );
     });
 
