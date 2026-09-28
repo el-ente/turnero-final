@@ -164,6 +164,11 @@ POST /recallTurn { terminalId, turnId }
   # start/finish/noShow/recall: 409 si el turno no lo está atendiendo ESA terminal
   # (turn.terminalId / terminal.currentTurnId), aunque el usuario tenga acceso a ella.
 
+POST /setTerminalStatus { terminalId, status: "available" | "offline" }
+  → { success: true }
+  # Pausar/Reanudar desde Terminal (cualquier staff con acceso a la terminal). updateTerminal
+  # sigue siendo solo admin porque expone sectores/colas/estrategia.
+
 POST /reassignTerminalQueues { terminalId, queueIds }
   → Terminal
   # Autoservicio: el cajero cambia las colas activas de SU PROPIA terminal sin pasar

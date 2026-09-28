@@ -358,3 +358,14 @@ export async function reassignTerminalQueues(terminalId: string, queueIds: strin
   await syncServedBy(terminalId, previousQueueIds, queueIds);
   return updated;
 }
+
+const SELF_SERVICE_STATUSES: TerminalStatus[] = [TerminalStatus.AVAILABLE, TerminalStatus.OFFLINE];
+
+// Operator-facing pause/resume, so cashiers don't need the admin-only
+// updateTerminal (which would also expose sectors/queues/strategy).
+export async function setTerminalStatus(terminalId: string, status: TerminalStatus): Promise<void> {
+  if (!SELF_SERVICE_STATUSES.includes(status)) {
+    throw new ValidationError(`status must be one of: ${SELF_SERVICE_STATUSES.join(", ")}`);
+  }
+  await db.collection("terminals").doc(terminalId).update({status, updatedAt: new Date()});
+}

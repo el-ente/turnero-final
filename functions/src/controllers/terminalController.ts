@@ -2,7 +2,7 @@ import {onRequest} from "firebase-functions/v2/https";
 import {AppUser, UserRole, canAccessTerminal} from "shared";
 import {
   getNextTurn, callTurn, startTurn, finishTurn, recallTurn, handleNoShow, getTerminalById,
-  reassignTerminalQueues,
+  reassignTerminalQueues, setTerminalStatus,
 } from "../services/terminalService";
 import {BusinessError, ForbiddenError} from "../utils/errors";
 import {logger} from "../config/firebase-admin";
@@ -221,6 +221,33 @@ export const reassignTerminalQueuesHandler = onRequest({cors: true, invoker: "pu
       res.status(error.statusCode).json({error: error.message, code: error.code});
     } else {
       logger.error("Error reassigning terminal queues:", error);
+      res.status(500).json({error: "Internal server error"});
+    }
+  }
+}));
+
+export const setTerminalStatusHandler = onRequest({cors: true, invoker: "public"}, requireRole(STAFF_ROLES, async (req, res, user) => {
+  try {
+    if (req.method !== "POST") {
+      res.status(405).json({error: "Method not allowed"});
+      return;
+    }
+
+    const {terminalId, status} = req.body;
+    if (!terminalId || !status) {
+      res.status(400).json({error: "terminalId and status are required"});
+      return;
+    }
+
+    await assertTerminalAccess(user, terminalId);
+
+    await setTerminalStatus(terminalId, status);
+    res.status(200).json({success: true});
+  } catch (error) {
+    if (error instanceof BusinessError) {
+      res.status(error.statusCode).json({error: error.message, code: error.code});
+    } else {
+      logger.error("Error setting terminal status:", error);
       res.status(500).json({error: "Internal server error"});
     }
   }

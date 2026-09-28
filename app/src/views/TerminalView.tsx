@@ -11,7 +11,7 @@ import {
   finishTurn,
   noShowTurn,
   recallTurn,
-  apiUpdateTerminal,
+  apiSetTerminalStatus,
   apiReassignTerminalQueues,
 } from "../lib/api";
 import { toDate } from "../lib/dates";
@@ -237,7 +237,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     if (!terminal) return;
     const nextStatus = terminal.status === "offline" ? "available" : "offline";
     try {
-      await apiUpdateTerminal(terminalId, { status: nextStatus });
+      await apiSetTerminalStatus(terminalId, nextStatus);
       showMessage("success", nextStatus === "offline" ? "Terminal pausada" : "Terminal reanudada");
     } catch (err) {
       showMessage("error", err instanceof Error ? err.message : "Error");

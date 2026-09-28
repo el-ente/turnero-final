@@ -39,6 +39,7 @@ const GATED_HANDLERS: Record<string, (req: any, res: any) => void | Promise<void
   "terminal.recallTurn": terminalController.recallTurnHandler,
   "terminal.noShow": terminalController.noShowHandler,
   "terminal.reassignTerminalQueues": terminalController.reassignTerminalQueuesHandler,
+  "terminal.setTerminalStatus": terminalController.setTerminalStatusHandler,
   "admin.getQueueStats": adminController.getQueueStatsHandler,
   "admin.getSectorStats": adminController.getSectorStatsHandler,
   "admin.getTerminalStats": adminController.getTerminalStatsHandler,

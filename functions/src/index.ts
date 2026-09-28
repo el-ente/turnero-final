@@ -8,6 +8,7 @@ import {
   recallTurnHandler,
   noShowHandler,
   reassignTerminalQueuesHandler,
+  setTerminalStatusHandler,
 } from "./controllers/terminalController";
 import {
   getQueueStatsHandler, getSectorStatsHandler, getTerminalStatsHandler, getQueueDailyStatsHandler,
@@ -48,6 +49,7 @@ export const finishTurn = finishTurnHandler;
 export const recallTurn = recallTurnHandler;
 export const noShow = noShowHandler;
 export const reassignTerminalQueues = reassignTerminalQueuesHandler;
+export const setTerminalStatus = setTerminalStatusHandler;
 
 // Admin endpoints
 export const getQueueStats = getQueueStatsHandler;

@@ -1,0 +1,22 @@
+meta {
+  name: Set Terminal Status
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/setTerminalStatus
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+body:json {
+  {
+    "terminalId": "",
+    "status": "offline"
+  }
+}

@@ -1,9 +1,9 @@
 import {
   getNextTurn, callTurn, startTurn, finishTurn, recallTurn, handleNoShow, nextRatioCounterState,
-  reassignTerminalQueues,
+  reassignTerminalQueues, setTerminalStatus,
 } from "../services/terminalService";
 import {db} from "../config/firebase-admin";
-import {Terminal, Turn, TurnStatus, ServingStrategy, Queue} from "shared";
+import {Terminal, Turn, TurnStatus, TerminalStatus, ServingStrategy, Queue} from "shared";
 import {NotFoundError, ConflictError, ValidationError, ForbiddenError} from "../utils/errors";
 import {mockRunTransaction} from "./helpers";
 import {getWaitingTurnsAcrossQueues, getQueuesByIds} from "../services/queueService";
@@ -1066,6 +1066,25 @@ describe("Terminal Service", () => {
       );
       expect(syncServedBy).toHaveBeenCalledWith("terminal-1", ["queue-1"], ["queue-2"]);
       expect(result.activeQueueIds).toEqual(["queue-2"]);
+    });
+  });
+
+  describe("setTerminalStatus", () => {
+    it("writes the status for available/offline", async () => {
+      const updateSpy = jest.fn().mockResolvedValue(undefined);
+      (db.collection as jest.Mock).mockReturnValue({doc: jest.fn().mockReturnValue({update: updateSpy})});
+
+      await setTerminalStatus("terminal-1", TerminalStatus.OFFLINE);
+
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({status: TerminalStatus.OFFLINE}));
+    });
+
+    it("rejects any other status without writing", async () => {
+      const updateSpy = jest.fn();
+      (db.collection as jest.Mock).mockReturnValue({doc: jest.fn().mockReturnValue({update: updateSpy})});
+
+      await expect(setTerminalStatus("terminal-1", TerminalStatus.BUSY)).rejects.toThrow(ValidationError);
+      expect(updateSpy).not.toHaveBeenCalled();
     });
   });
 });

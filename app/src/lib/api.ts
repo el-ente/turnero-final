@@ -110,6 +110,10 @@ export async function apiReassignTerminalQueues(terminalId: string, queueIds: st
   return callFunction<Terminal>("reassignTerminalQueues", "POST", { terminalId, queueIds });
 }
 
+export async function apiSetTerminalStatus(terminalId: string, status: "available" | "offline"): Promise<void> {
+  await callFunction<{ success: boolean }>("setTerminalStatus", "POST", { terminalId, status });
+}
+
 // Admin API
 export interface StatsSummary {
   totalCreated: number;
