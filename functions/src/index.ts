@@ -10,11 +10,12 @@ import {
   reassignTerminalQueuesHandler,
 } from "./controllers/terminalController";
 import {
-  getQueueStatsHandler,
+  getQueueStatsHandler, getSectorStatsHandler, getTerminalStatsHandler, getQueueDailyStatsHandler,
   createSectorHandler, listSectorsHandler, updateSectorHandler, deleteSectorHandler,
   createQueueHandler, listQueuesHandler, updateQueueHandler, deleteQueueHandler,
   createTerminalHandler, listTerminalsHandler, updateTerminalHandler, deleteTerminalHandler,
 } from "./controllers/adminController";
+import {dailyStatsRollupHandler} from "./controllers/scheduledController";
 import {
   bootstrapUserHandler, listUsersHandler, inviteUserHandler, updateUserRoleHandler, deleteUserHandler,
 } from "./controllers/userController";
@@ -50,6 +51,12 @@ export const reassignTerminalQueues = reassignTerminalQueuesHandler;
 
 // Admin endpoints
 export const getQueueStats = getQueueStatsHandler;
+export const getSectorStats = getSectorStatsHandler;
+export const getTerminalStats = getTerminalStatsHandler;
+export const getQueueDailyStats = getQueueDailyStatsHandler;
+
+// Scheduled jobs
+export const dailyStatsRollup = dailyStatsRollupHandler;
 
 // CRUD — Sectors
 export const createSector = createSectorHandler;

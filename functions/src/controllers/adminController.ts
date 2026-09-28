@@ -1,6 +1,7 @@
 import {onRequest} from "firebase-functions/v2/https";
 import {UserRole} from "shared";
-import {getQueueStats} from "../services/statsService";
+import {getQueueStats, getSectorStats, getTerminalStatsForQueue} from "../services/statsService";
+import {getQueueDailyStatsRange} from "../services/dailyStatsService";
 import {
   createSector, listSectors, updateSector, deleteSector,
   createQueue, listQueues, updateQueue, deleteQueue,
@@ -9,6 +10,8 @@ import {
 import {BusinessError} from "../utils/errors";
 import {logger} from "../config/firebase-admin";
 import {requireRole} from "../middleware/auth";
+
+const MAX_DAILY_STATS_DAYS = 90;
 
 function handleError(res: any, error: unknown) {
   if (error instanceof BusinessError) {
@@ -32,6 +35,58 @@ export const getQueueStatsHandler = onRequest({cors: true, invoker: "public"}, r
     }
     const stats = await getQueueStats(queueId);
     res.status(200).json(stats);
+  } catch (error) {
+    handleError(res, error);
+  }
+}));
+
+export const getSectorStatsHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN, UserRole.SUPERVISOR], async (req, res) => {
+  try {
+    if (req.method !== "GET") {
+      res.status(405).json({error: "Method not allowed"}); return;
+    }
+    const {sectorId} = req.query;
+    if (!sectorId || typeof sectorId !== "string") {
+      res.status(400).json({error: "sectorId query parameter is required"}); return;
+    }
+    const stats = await getSectorStats(sectorId);
+    res.status(200).json(stats);
+  } catch (error) {
+    handleError(res, error);
+  }
+}));
+
+export const getTerminalStatsHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN, UserRole.SUPERVISOR], async (req, res) => {
+  try {
+    if (req.method !== "GET") {
+      res.status(405).json({error: "Method not allowed"}); return;
+    }
+    const {queueId} = req.query;
+    if (!queueId || typeof queueId !== "string") {
+      res.status(400).json({error: "queueId query parameter is required"}); return;
+    }
+    const stats = await getTerminalStatsForQueue(queueId);
+    res.status(200).json(stats);
+  } catch (error) {
+    handleError(res, error);
+  }
+}));
+
+export const getQueueDailyStatsHandler = onRequest({cors: true, invoker: "public"}, requireRole([UserRole.ADMIN, UserRole.SUPERVISOR], async (req, res) => {
+  try {
+    if (req.method !== "GET") {
+      res.status(405).json({error: "Method not allowed"}); return;
+    }
+    const {queueIds, days} = req.query;
+    if (!queueIds || typeof queueIds !== "string") {
+      res.status(400).json({error: "queueIds query parameter is required"}); return;
+    }
+    const parsedDays = days ? Number(days) : 7;
+    if (!Number.isInteger(parsedDays) || parsedDays < 1 || parsedDays > MAX_DAILY_STATS_DAYS) {
+      res.status(400).json({error: `days must be an integer between 1 and ${MAX_DAILY_STATS_DAYS}`}); return;
+    }
+    const results = await getQueueDailyStatsRange(queueIds.split(","), parsedDays);
+    res.status(200).json({results});
   } catch (error) {
     handleError(res, error);
   }

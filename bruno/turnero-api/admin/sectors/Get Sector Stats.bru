@@ -1,0 +1,19 @@
+meta {
+  name: Get Sector Stats
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/getSectorStats?sectorId={{sectorId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+params:query {
+  sectorId:
+}

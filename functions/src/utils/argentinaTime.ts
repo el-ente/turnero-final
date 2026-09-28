@@ -19,6 +19,23 @@ export function todayInArgentina(): string {
   return formatDate(nowShiftedToArgentina());
 }
 
+export function yesterdayInArgentina(): string {
+  const yesterday = new Date(nowShiftedToArgentina().getTime() - 24 * 60 * 60 * 1000);
+  return formatDate(yesterday);
+}
+
+// dateStr is a plain "YYYY-MM-DD" Argentina calendar date. Returns the UTC
+// instants bounding that calendar day, for building Firestore range queries
+// against Timestamp fields (createdAt >= start && createdAt < end).
+export function argentinaMidnightRangeFor(dateStr: string): { start: Date; end: Date } {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  // UTC midnight for that calendar date, then shifted forward by the
+  // Argentina offset to land on that date's actual midnight in Argentina.
+  const start = new Date(Date.UTC(year, month - 1, day) - ARGENTINA_OFFSET * 60000);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return {start, end};
+}
+
 // dateStr is a plain "YYYY-MM-DD" calendar date — parsed as UTC noon so the
 // result is independent of the machine's local timezone.
 export function dayOfWeekInArgentina(dateStr: string): number {

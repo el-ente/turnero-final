@@ -111,8 +111,39 @@ export async function apiReassignTerminalQueues(terminalId: string, queueIds: st
 }
 
 // Admin API
+export interface StatsSummary {
+  totalCreated: number;
+  waitingCount: number;
+  calledCount: number;
+  attendingCount: number;
+  finishedCount: number;
+  noShowCount: number;
+  cancelledCount: number;
+  avgWaitTimeSeconds: number | null;
+  avgServiceTimeSeconds: number | null;
+}
+
+export interface SectorStats {
+  sectorId: string;
+  today: StatsSummary;
+  queues: Array<{ queueId: string } & StatsSummary>;
+}
+
+export interface TerminalStatsBreakdown {
+  queueId: string;
+  terminals: Array<{ terminalId: string; turnCount: number; avgServiceTimeSeconds: number | null }>;
+}
+
 export async function getQueueStats(queueId: string) {
   return callFunction("getQueueStats", "GET", undefined, { queueId });
+}
+
+export async function getSectorStats(sectorId: string) {
+  return callFunction<SectorStats>("getSectorStats", "GET", undefined, { sectorId });
+}
+
+export async function getTerminalStats(queueId: string) {
+  return callFunction<TerminalStatsBreakdown>("getTerminalStats", "GET", undefined, { queueId });
 }
 
 // CRUD — Sectors

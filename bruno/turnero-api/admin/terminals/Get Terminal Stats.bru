@@ -1,0 +1,19 @@
+meta {
+  name: Get Terminal Stats
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/getTerminalStats?queueId={{queueId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+params:query {
+  queueId:
+}

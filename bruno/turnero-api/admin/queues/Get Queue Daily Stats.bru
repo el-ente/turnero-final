@@ -1,0 +1,20 @@
+meta {
+  name: Get Queue Daily Stats
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/getQueueDailyStats?queueIds={{queueId}}&days={{days}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+params:query {
+  queueIds:
+  days:
+}

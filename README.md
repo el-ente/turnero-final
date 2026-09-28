@@ -172,12 +172,34 @@ POST /reassignTerminalQueues { terminalId, queueIds }
 
 ### Admin
 
-CRUD de sectors/queues/terminals: solo admin. `getQueueStats`: admin o supervisor.
+CRUD de sectors/queues/terminals: solo admin. Stats (`getQueueStats`/`getSectorStats`/`getTerminalStats`): admin o supervisor.
 
 ```bash
 GET /getQueueStats?queueId=queue-1
-  → { totalTodayCreated, waitingCount, finishedCount, avgWaitTimeSeconds }
+  → { queueId, totalTodayCreated, waitingCount, calledCount, attendingCount, finishedCount,
+      noShowCount, cancelledCount, avgWaitTimeSeconds, avgServiceTimeSeconds }
+  # avgWaitTimeSeconds (createdAt→calledAt) y avgServiceTimeSeconds (attendingAt→finishedAt)
+  # son null (no 0) si ningún turno terminó hoy — 0 implicaría atención instantánea.
+
+GET /getSectorStats?sectorId=sector-1
+  → { sectorId, today: <mismos campos que arriba sin queueId>, queues: [{ queueId, ...mismos campos }] }
+  # Combinado de todas las colas del sector + desglose por cola, scoped a "hoy". Sector sin
+  # colas o sin turnos → today en cero, queues: [] (no error). Sector con más de 30 colas → 400
+  # (cap del operador "in" de Firestore; no hay batching implementado).
+
+GET /getTerminalStats?queueId=queue-1
+  → { queueId, terminals: [{ terminalId, turnCount, avgServiceTimeSeconds }] }
+  # Desglose por terminal de una cola, scoped a "hoy". Turnos sin terminalId (nunca llamados)
+  # se excluyen, no se cuentan como terminal "desconocida".
+
+GET /getQueueDailyStats?queueIds=queue-1,queue-2&days=7
+  → { results: QueueDailyStats[] }
+  # Lectura cruda de queueDailyStats (días sin rollup — hoy, o anteriores al deploy de este
+  # pipeline — se omiten en silencio, no se rellenan con ceros). days: 1-90, default 7.
+  # Sin UI de tendencia todavía (no hay librería de gráficos elegida).
 ```
+
+**Función programada:** `dailyStatsRollup` corre todos los días a las 3am hora Argentina (`onSchedule`, timezone `America/Argentina/Buenos_Aires`). Recalcula el día anterior completo por cola y sobreescribe (`.set()`, no incremental) el doc en `queueDailyStats` — idempotente, se puede re-ejecutar para la misma fecha sin duplicar conteos. No toca `createTurn`/`callTurn`/`finishTurn`/`handleNoShow`/`cancelTurn`.
 
 CRUD completo para sectors, queues y terminals (`GET` lista, `POST` crea, `PUT ?<id>=...` actualiza, `DELETE ?<id>=...` elimina):
 
@@ -348,6 +370,7 @@ firebase deploy --project dev --only hosting:app
 - **queues**: { id, sectorId, name, type, reenqueueConfig, servedBy[], ... }
 - **terminals**: { id, name, sectorIds[], activeQueueIds[], servingStrategy, ... }
 - **turns**: { id, memberNumber, queueId, status, queuedAt, ... }
+- **queueDailyStats**: { queueId, date (`YYYY-MM-DD`, día calendario Argentina), totalCreated, waitingCount, calledCount, attendingCount, finishedCount, noShowCount, cancelledCount, totalWaitTimeSeconds, totalServiceTimeSeconds, computedAt } — id `{queueId}_{date}`. Rollup diario por cola, escrito por la función programada `dailyStatsRollup` (ver más abajo); guarda sumas y counts, no promedios, para poder derivar totales de sector sumando sin re-escanear `turns`. Es la única collection sin acceso de cliente en absoluto (ni siquiera lectura pública): se escribe y se lee exclusivamente vía Admin SDK (Cloud Functions), así que no tiene entrada en `firestore.rules` — el default-deny ya alcanza.
 - **users**: { id, uid?, email, role (`admin`\|`supervisor`\|`cashier`), assignedSectorIds[], status (`pending`\|`active`), createdAt, updatedAt } — `id` es el `uid` de Firebase Auth una vez activo; mientras está `pending` (invitado por email, todavía no logueado) es un id autogenerado.
 
 El ticket mostrado en Totem/Display/Terminal **es** `memberNumber` — no hay numeración secuencial diaria ni reset a medianoche. `queuedAt` es la clave de orden interna (= `createdAt` al crear el turno, se adelanta al reencolar por no-show) y reemplaza los antiguos `originalTurnNumber`/`currentTurnNumber`.

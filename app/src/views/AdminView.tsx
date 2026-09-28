@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import type { Sector, Queue, Terminal, AppUser, AppointmentService, AppointmentBlock, AvailabilityRule } from "shared";
 import { UserRole, UserStatus } from "shared";
 import { AdminModal } from "../components/AdminModal";
+import type { SectorStats, TerminalStatsBreakdown } from "../lib/api";
 import {
-  getQueueStats,
+  getQueueStats, getSectorStats, getTerminalStats,
   apiListSectors, apiCreateSector, apiUpdateSector, apiDeleteSector,
   apiListQueues, apiCreateQueue, apiUpdateQueue, apiDeleteQueue,
   apiListTerminals, apiCreateTerminal, apiUpdateTerminal, apiDeleteTerminal,
@@ -30,8 +31,9 @@ function formatAvailabilityRules(rules: AvailabilityRule[]): string {
     .join("; ");
 }
 
-/** avgWaitTimeSeconds arrives as raw seconds — render it human-scannable. */
-function formatWait(seconds: number): string {
+/** avgWaitTimeSeconds/avgServiceTimeSeconds arrive as raw seconds, or null when no turn finished today. */
+function formatWait(seconds: number | null): string {
+  if (seconds === null) return "—";
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes}m`;
@@ -68,7 +70,10 @@ export function AdminView() {
   const [appointmentServices, setAppointmentServices] = useState<AppointmentService[]>([]);
   const [appointmentBlocks, setAppointmentBlocks] = useState<AppointmentBlock[]>([]);
   const [statsData, setStatsData] = useState<any>(null);
+  const [terminalStatsData, setTerminalStatsData] = useState<TerminalStatsBreakdown | null>(null);
+  const [sectorStatsData, setSectorStatsData] = useState<SectorStats | null>(null);
   const [selectedQueueId, setSelectedQueueId] = useState<string>("");
+  const [selectedSectorId, setSelectedSectorId] = useState<string>("");
   const [modal, setModal] = useState<ModalMode>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -102,11 +107,24 @@ export function AdminView() {
 
   const handleGetStats = async (queueId: string) => {
     try {
-      const stats = await getQueueStats(queueId);
+      const [stats, terminalStats] = await Promise.all([getQueueStats(queueId), getTerminalStats(queueId)]);
       setStatsData(stats);
+      setTerminalStatsData(terminalStats);
+      setSectorStatsData(null);
       setSelectedQueueId(queueId);
       setTab("stats");
     } catch { showToast("error", "Error obteniendo estadísticas"); }
+  };
+
+  const handleGetSectorStats = async (sectorId: string) => {
+    try {
+      const stats = await getSectorStats(sectorId);
+      setSectorStatsData(stats);
+      setStatsData(null);
+      setTerminalStatsData(null);
+      setSelectedSectorId(sectorId);
+      setTab("stats");
+    } catch { showToast("error", "Error obteniendo estadísticas del sector"); }
   };
 
   const handleToggleQueueActive = async (queue: Queue) => {
@@ -121,6 +139,7 @@ export function AdminView() {
 
   const getSectorName = (sectorId: string) => sectors.find((s) => s.id === sectorId)?.name || sectorId;
   const getQueueName = (queueId: string) => queues.find((q) => q.id === queueId)?.name || queueId;
+  const getTerminalName = (terminalId: string) => terminals.find((t) => t.id === terminalId)?.name || terminalId;
 
   const tabs = [
     { key: "queues" as const, label: "Colas" },
@@ -491,29 +510,114 @@ export function AdminView() {
         )}
 
         {/* ─── Stats ─── */}
-        {tab === "stats" && statsData && (
+        {tab === "stats" && (
           <div className="adm-section">
             <div className="adm-section-top">
-              <h2>Estadísticas — {getQueueName(selectedQueueId)}</h2>
-              <button className="adm-link-btn" onClick={() => setTab("queues")}>← Volver</button>
+              <h2>Estadísticas</h2>
+              <select
+                className="form-select"
+                value={selectedSectorId}
+                onChange={(e) => { if (e.target.value) handleGetSectorStats(e.target.value); }}
+              >
+                <option value="">Ver por sector…</option>
+                {sectors.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
             </div>
-            <div className="adm-stats-grid">
-              {[
-                { label: "Creados hoy", value: statsData.totalTodayCreated },
-                { label: "Esperando", value: statsData.waitingCount },
-                { label: "Llamados", value: statsData.calledCount },
-                { label: "Atendiendo", value: statsData.attendingCount },
-                { label: "Finalizados", value: statsData.finishedCount },
-                { label: "No presentados", value: statsData.noShowCount },
-                { label: "Cancelados", value: statsData.cancelledCount },
-                { label: "Espera promedio", value: formatWait(statsData.avgWaitTimeSeconds) },
-              ].map((s) => (
-                <div key={s.label} className="adm-stat-card tear-edge">
-                  <div className="adm-stat-label">{s.label}</div>
-                  <div className="adm-stat-value">{s.value}</div>
+
+            {sectorStatsData && (
+              <>
+                <h3>{getSectorName(sectorStatsData.sectorId)} — hoy</h3>
+                <div className="adm-stats-grid">
+                  {[
+                    { label: "Creados hoy", value: sectorStatsData.today.totalCreated },
+                    { label: "Esperando", value: sectorStatsData.today.waitingCount },
+                    { label: "Llamados", value: sectorStatsData.today.calledCount },
+                    { label: "Atendiendo", value: sectorStatsData.today.attendingCount },
+                    { label: "Finalizados", value: sectorStatsData.today.finishedCount },
+                    { label: "No presentados", value: sectorStatsData.today.noShowCount },
+                    { label: "Cancelados", value: sectorStatsData.today.cancelledCount },
+                    { label: "Espera promedio", value: formatWait(sectorStatsData.today.avgWaitTimeSeconds) },
+                    { label: "Servicio promedio", value: formatWait(sectorStatsData.today.avgServiceTimeSeconds) },
+                  ].map((s) => (
+                    <div key={s.label} className="adm-stat-card tear-edge">
+                      <div className="adm-stat-label">{s.label}</div>
+                      <div className="adm-stat-value">{s.value}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+                <div className="adm-table-wrap">
+                  <table className="adm-table">
+                    <thead>
+                      <tr>
+                        <th>Cola</th><th>Creados</th><th>Finalizados</th>
+                        <th>Espera prom.</th><th>Servicio prom.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sectorStatsData.queues.map((q) => (
+                        <tr key={q.queueId}>
+                          <td className="adm-bold">{getQueueName(q.queueId)}</td>
+                          <td>{q.totalCreated}</td>
+                          <td>{q.finishedCount}</td>
+                          <td>{formatWait(q.avgWaitTimeSeconds)}</td>
+                          <td>{formatWait(q.avgServiceTimeSeconds)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {statsData && (
+              <>
+                <h3>{getQueueName(selectedQueueId)} — hoy</h3>
+                <div className="adm-stats-grid">
+                  {[
+                    { label: "Creados hoy", value: statsData.totalTodayCreated },
+                    { label: "Esperando", value: statsData.waitingCount },
+                    { label: "Llamados", value: statsData.calledCount },
+                    { label: "Atendiendo", value: statsData.attendingCount },
+                    { label: "Finalizados", value: statsData.finishedCount },
+                    { label: "No presentados", value: statsData.noShowCount },
+                    { label: "Cancelados", value: statsData.cancelledCount },
+                    { label: "Espera promedio", value: formatWait(statsData.avgWaitTimeSeconds) },
+                    { label: "Servicio promedio", value: formatWait(statsData.avgServiceTimeSeconds) },
+                  ].map((s) => (
+                    <div key={s.label} className="adm-stat-card tear-edge">
+                      <div className="adm-stat-label">{s.label}</div>
+                      <div className="adm-stat-value">{s.value}</div>
+                    </div>
+                  ))}
+                </div>
+                {terminalStatsData && terminalStatsData.terminals.length > 0 && (
+                  <div className="adm-table-wrap">
+                    <table className="adm-table">
+                      <thead>
+                        <tr><th>Terminal</th><th>Turnos atendidos</th><th>Servicio prom.</th></tr>
+                      </thead>
+                      <tbody>
+                        {terminalStatsData.terminals.map((t) => (
+                          <tr key={t.terminalId}>
+                            <td className="adm-bold">{getTerminalName(t.terminalId)}</td>
+                            <td>{t.turnCount}</td>
+                            <td>{formatWait(t.avgServiceTimeSeconds)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
+            {!sectorStatsData && !statsData && (
+              <div className="adm-empty">
+                <p className="adm-empty-title">Elegí un sector arriba, o "Stats" en una cola desde la pestaña Colas.</p>
+              </div>
+            )}
           </div>
         )}
       </div>
