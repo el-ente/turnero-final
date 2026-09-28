@@ -33,7 +33,7 @@ export async function createTurn(
   const createdAt = new Date();
   const newTurn: Turn = {
     id: turnRef.id, memberNumber, queueId, queuedAt: createdAt,
-    status: TurnStatus.WAITING, channel, recallCount: 0, createdAt,
+    status: TurnStatus.WAITING, channel, recallCount: 0, requeueCount: 0, createdAt,
   };
   await turnRef.set(newTurn);
   return newTurn;

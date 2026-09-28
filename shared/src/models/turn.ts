@@ -1,9 +1,11 @@
 /**
  * Turn lifecycle: waiting -> called -> attending -> finished, or cancelled.
  * On no-show, terminalService.handleNoShow requeues the turn (back to
- * waiting) while reenqueueConfig.maxAttempts allows it, then marks it
+ * waiting) while requeueCount < reenqueueConfig.maxAttempts, then marks it
  * NO_SHOW once exhausted — kept distinct from CANCELLED, which only
  * customer-initiated cancellation (turnService.cancelTurn) writes.
+ * recallCount counts re-calls within the current call only (reset on
+ * requeue), so re-calling never eats into the requeue budget.
  */
 export const TurnStatus = {
   WAITING: "waiting",
@@ -26,6 +28,7 @@ export interface Turn {
   status: TurnStatus;
   channel: Channel;
   recallCount: number;
+  requeueCount?: number; // absent on turns created before this field existed
   createdAt: Date;
   calledAt?: Date;
   attendingAt?: Date;

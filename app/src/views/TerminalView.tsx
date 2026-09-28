@@ -419,8 +419,8 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
               <span className={`term-status-pill term-status-${currentTurn.status}`}>
                 {STATUS_LABELS[currentTurn.status] ?? currentTurn.status}
               </span>
-              {currentTurn.recallCount > 0 && (
-                <span className="term-recall-badge">Reintentos: {currentTurn.recallCount}</span>
+              {(currentTurn.requeueCount ?? 0) > 0 && (
+                <span className="term-recall-badge">Reencolado: {currentTurn.requeueCount}x</span>
               )}
             </>
           ) : (
@@ -443,7 +443,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
                 <span className="term-queue-time">
                   {toDate(turn.createdAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
                 </span>
-                {turn.recallCount > 0 && <span className="term-queue-r">R{turn.recallCount}</span>}
+                {(turn.requeueCount ?? 0) > 0 && <span className="term-queue-r">R{turn.requeueCount}</span>}
               </div>
             ))}
             {waitingTurns.length === 0 && (

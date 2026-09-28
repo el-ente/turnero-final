@@ -826,7 +826,8 @@ describe("Terminal Service", () => {
         expect.anything(),
         expect.objectContaining({
           queuedAt: new Date(base + 1000 + 1),
-          recallCount: 1,
+          requeueCount: 1,
+          recallCount: 0,
           status: TurnStatus.WAITING,
         })
       );
@@ -864,7 +865,8 @@ describe("Terminal Service", () => {
         expect.anything(),
         expect.objectContaining({
           queuedAt: new Date(base + 1000 + 1),
-          recallCount: 1,
+          requeueCount: 1,
+          recallCount: 0,
           status: TurnStatus.WAITING,
         })
       );
@@ -904,7 +906,8 @@ describe("Terminal Service", () => {
         queuedAt: new Date(),
         status: TurnStatus.CALLED,
         channel: "totem",
-        recallCount: 3,
+        recallCount: 0,
+        requeueCount: 3,
         createdAt: new Date(),
       };
       const mockQueue = {reenqueueConfig: {enabled: true, maxAttempts: 3, positionsBack: 2}};
@@ -915,6 +918,29 @@ describe("Terminal Service", () => {
       expect(transaction.update).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({status: TurnStatus.NO_SHOW})
+      );
+    });
+
+    it("still requeues when re-calls exceed maxAttempts but requeues don't", async () => {
+      mockCollectionDocs();
+      const mockTurn: Turn = {
+        id: "turn-1",
+        memberNumber: 1,
+        queueId: "queue-1",
+        queuedAt: new Date(),
+        status: TurnStatus.CALLED,
+        channel: "totem",
+        recallCount: 5,
+        createdAt: new Date(),
+      };
+      const mockQueue = {reenqueueConfig: {enabled: true, maxAttempts: 2, positionsBack: 2}};
+      const transaction = mockTurnAndQueue(mockTurn, mockQueue, []);
+
+      await handleNoShow("terminal-1", "turn-1");
+
+      expect(transaction.update).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({status: TurnStatus.WAITING, requeueCount: 1, recallCount: 0})
       );
     });
 

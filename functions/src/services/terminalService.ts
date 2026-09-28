@@ -275,8 +275,9 @@ export async function handleNoShow(terminalId: string, turnId: string): Promise<
 
     const queue = queueDoc.data() as Queue;
     const config = queue.reenqueueConfig;
+    const requeueCount = turn.requeueCount ?? 0;
 
-    if (config.enabled && turn.recallCount < config.maxAttempts) {
+    if (config.enabled && requeueCount < config.maxAttempts) {
       // Requeue the turn: anchor its new queuedAt to just after the turn at the
       // configured positionsBack in the current waiting list (clamped to the
       // list's length), so it lands that many positions back, not always at
@@ -296,7 +297,8 @@ export async function handleNoShow(terminalId: string, turnId: string): Promise<
       transaction.update(turnRef, {
         queuedAt: newQueuedAt,
         status: TurnStatus.WAITING,
-        recallCount: turn.recallCount + 1,
+        requeueCount: requeueCount + 1,
+        recallCount: 0,
         lastRequeueAt: new Date(),
       });
     } else {
