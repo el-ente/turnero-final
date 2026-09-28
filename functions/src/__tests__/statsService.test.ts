@@ -123,7 +123,7 @@ describe("Stats Service", () => {
       expect(result[0].terminalId).toBe("term-1");
     });
 
-    it("groups counts and avg service time per terminal", () => {
+    it("counts only finished turns per terminal, alongside avg service time", () => {
       const attendingAt = new Date("2026-03-26T10:00:00");
       const finishedAt = new Date("2026-03-26T10:01:00"); // +60s
       const turns = [
@@ -136,9 +136,9 @@ describe("Stats Service", () => {
       const term1 = result.find((t) => t.terminalId === "term-1");
       const term2 = result.find((t) => t.terminalId === "term-2");
 
-      expect(term1?.turnCount).toBe(2);
+      expect(term1?.finishedCount).toBe(1);
       expect(term1?.avgServiceTimeSeconds).toBe(60);
-      expect(term2?.turnCount).toBe(1);
+      expect(term2?.finishedCount).toBe(1);
       expect(term2?.avgServiceTimeSeconds).toBe(60);
     });
   });

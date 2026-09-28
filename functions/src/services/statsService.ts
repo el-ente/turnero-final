@@ -112,7 +112,7 @@ function toStatsSummary(aggregate: TurnAggregate): StatsSummary {
 
 export interface TerminalAggregate {
   terminalId: string;
-  turnCount: number;
+  finishedCount: number;
   avgServiceTimeSeconds: number | null;
 }
 
@@ -131,7 +131,7 @@ export function aggregateByTerminal(turns: Turn[]): TerminalAggregate[] {
     const {finishedCount, totalServiceTimeSeconds} = aggregateTurns(terminalTurns);
     return {
       terminalId,
-      turnCount: terminalTurns.length,
+      finishedCount,
       avgServiceTimeSeconds: avgSeconds(totalServiceTimeSeconds, finishedCount),
     };
   });

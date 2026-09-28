@@ -195,7 +195,8 @@ GET /getSectorStats?sectorId=sector-1
   # (cap del operador "in" de Firestore; no hay batching implementado).
 
 GET /getTerminalStats?queueId=queue-1
-  → { queueId, terminals: [{ terminalId, turnCount, avgServiceTimeSeconds }] }
+  → { queueId, terminals: [{ terminalId, finishedCount, avgServiceTimeSeconds }] }
+  # finishedCount = turnos FINISHED por esa terminal (no cuenta no-shows ni turnos en curso).
   # Desglose por terminal de una cola, scoped a "hoy". Turnos sin terminalId (nunca llamados)
   # se excluyen, no se cuentan como terminal "desconocida".
 

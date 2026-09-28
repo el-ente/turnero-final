@@ -602,7 +602,7 @@ export function AdminView() {
                         {terminalStatsData.terminals.map((t) => (
                           <tr key={t.terminalId}>
                             <td className="adm-bold">{getTerminalName(t.terminalId)}</td>
-                            <td>{t.turnCount}</td>
+                            <td>{t.finishedCount}</td>
                             <td>{formatWait(t.avgServiceTimeSeconds)}</td>
                           </tr>
                         ))}

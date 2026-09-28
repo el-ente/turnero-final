@@ -135,7 +135,7 @@ export interface SectorStats {
 
 export interface TerminalStatsBreakdown {
   queueId: string;
-  terminals: Array<{ terminalId: string; turnCount: number; avgServiceTimeSeconds: number | null }>;
+  terminals: Array<{ terminalId: string; finishedCount: number; avgServiceTimeSeconds: number | null }>;
 }
 
 export async function getQueueStats(queueId: string) {
