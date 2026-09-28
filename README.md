@@ -269,6 +269,8 @@ POST /createAppointment
   → Appointment (status: "reservada")
   # Transaccional: valida franja ofrecida + no bloqueada + con cupo, y que el memberNumber
   # no tenga ya otra Cita activa EN ESE MISMO Servicio (sí puede tener una en otro Servicio).
+  # "Activa" = RESERVADA/LLAMADA/ATENDIENDO con fecha >= hoy: una Cita de un día pasado que
+  # nadie llamó (queda RESERVADA, el no-show es manual) no bloquea volver a reservar.
 
 GET  /getAppointment?appointmentId=<id>&memberNumber=12345
   → Appointment

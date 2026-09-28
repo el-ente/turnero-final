@@ -12,7 +12,7 @@ El cliente definió: este módulo es **completamente independiente** del sistema
 Decisiones finales recibidas, incorporadas en todo el documento:
 
 1. Dato de verificación de identidad: **número de socio** (mismo concepto que ya usa Totem), no documento/DNI. Todo el documento usa "número de socio" de acá en adelante.
-2. Un mismo número de socio no puede tener más de una Cita activa simultánea **dentro del mismo Servicio** — sí puede tener Citas activas simultáneas en Servicios distintos (la regla es por Servicio, no global).
+2. Un mismo número de socio no puede tener más de una Cita activa simultánea **dentro del mismo Servicio** — sí puede tener Citas activas simultáneas en Servicios distintos (la regla es por Servicio, no global). "Activa" cuenta solo Citas de hoy en adelante: una Cita de un día pasado que quedó RESERVADA (nadie la llamó) no bloquea volver a reservar.
 3. Se elimina el check-in como paso del cliente. El staff **llama** a la Cita según su horario (mismo patrón que Terminal), con re-llamado, y marca no-show manualmente con doble confirmación — no hay mecanismo automático de no-show.
 4. Entra al MVP una **pantalla pública propia del módulo**, independiente de `PublicDisplay`, que refleja los llamados/re-llamados. Es opcional de usar.
 5. El Bloqueo se mantiene en el MVP; si se superpone con Citas ya confirmadas, se muestra un aviso informativo pero no impide crearlo, y no cancela nada automáticamente.

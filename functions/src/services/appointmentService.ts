@@ -4,7 +4,7 @@ import {
 } from "shared";
 import {db} from "../config/firebase-admin";
 import {NotFoundError, ConflictError, ValidationError, ForbiddenError} from "../utils/errors";
-import {isPastInArgentina} from "../utils/argentinaTime";
+import {isPastInArgentina, todayInArgentina} from "../utils/argentinaTime";
 import {
   computeCandidateSlots, applyBlocks, subtractCounts, slotKey, maxBookableDate, SlotAvailability,
 } from "./appointmentAvailability";
@@ -124,7 +124,12 @@ export async function createAppointment(data: {
         .where("memberNumber", "==", memberNumber)
         .where("status", "in", ACTIVE_APPOINTMENT_STATUSES)
     );
-    if (!duplicateSnap.empty) {
+    // No-show is manual and only reachable from LLAMADA, so a Cita nobody
+    // called stays RESERVADA forever — only today-or-later ones may block
+    // rebooking, or one missed appointment would lock the member out.
+    const today = todayInArgentina();
+    const hasUpcomingActive = duplicateSnap.docs.some((d) => (d.data() as Appointment).date >= today);
+    if (hasUpcomingActive) {
       throw new ConflictError("This member number already has an active appointment for this service");
     }
 

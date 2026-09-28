@@ -19,7 +19,19 @@ const activeService = {
   bookingHorizonDays: 60,
 };
 
+// Fixtures book 2026-09-28 09:00; freeze "now" before it so past-slot and
+// booking-horizon checks don't start failing once that date goes by.
+const FIXED_NOW = new Date("2026-09-20T12:00:00-03:00");
+
 describe("appointmentService", () => {
+  beforeAll(() => {
+    jest.useFakeTimers({now: FIXED_NOW, doNotFake: ["nextTick", "setImmediate", "queueMicrotask"]});
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     (db.collection as jest.Mock).mockImplementation(() => chainable());
@@ -37,7 +49,7 @@ describe("appointmentService", () => {
         .mockResolvedValueOnce({exists: true, data: () => activeService}) // service
         .mockResolvedValueOnce({docs: []}) // blocks
         .mockResolvedValueOnce({size: 0}) // capacity
-        .mockResolvedValueOnce({empty: true}); // duplicate guard
+        .mockResolvedValueOnce({docs: []}); // duplicate guard
 
       const result = await createAppointment(baseInput);
 
@@ -54,7 +66,7 @@ describe("appointmentService", () => {
         .mockResolvedValueOnce({exists: true, data: () => activeService})
         .mockResolvedValueOnce({docs: []})
         .mockResolvedValueOnce({size: 0})
-        .mockResolvedValueOnce({empty: true});
+        .mockResolvedValueOnce({docs: []});
 
       await createAppointment(baseInput);
 
@@ -129,10 +141,23 @@ describe("appointmentService", () => {
         .mockResolvedValueOnce({exists: true, data: () => activeService})
         .mockResolvedValueOnce({docs: []})
         .mockResolvedValueOnce({size: 0})
-        .mockResolvedValueOnce({empty: false});
+        .mockResolvedValueOnce({docs: [{data: () => ({date: "2026-09-28"})}]});
 
       await expect(createAppointment(baseInput)).rejects.toThrow();
       expect(transaction.set).not.toHaveBeenCalled();
+    });
+
+    it("ignores a past-dated appointment left RESERVADA (never called) when checking for duplicates", async () => {
+      const transaction = mockRunTransaction();
+      transaction.get
+        .mockResolvedValueOnce({exists: true, data: () => activeService})
+        .mockResolvedValueOnce({docs: []})
+        .mockResolvedValueOnce({size: 0})
+        .mockResolvedValueOnce({docs: [{data: () => ({date: "2026-09-14"})}]});
+
+      await createAppointment(baseInput);
+
+      expect(transaction.set).toHaveBeenCalled();
     });
   });
 
