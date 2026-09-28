@@ -186,6 +186,9 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
         await handleCallNext();
         return;
       }
+      // Only drop the optimistic turn if the listener hasn't already
+      // replaced it with the terminal's real current turn.
+      setCurrentTurn((shown) => (shown?.id === turn.id ? null : shown));
       showMessage("error", message);
       setLoading(false);
     }
@@ -285,7 +288,7 @@ function TerminalViewContent({ terminalId }: { terminalId: string }) {
     }
   };
 
-  const canCallNext = !loading && !!terminal && terminal.status !== "offline";
+  const canCallNext = !loading && !!terminal && terminal.status !== "offline" && !terminal.currentTurnId;
   const canStart = !loading && currentTurn?.status === "called";
   const canFinish = !loading && currentTurn?.status === "attending";
   const canRecall = !loading && currentTurn?.status === "called";
