@@ -161,6 +161,8 @@ POST /startTurn { terminalId, turnId }
 POST /finishTurn { terminalId, turnId }
 POST /noShow { terminalId, turnId }
 POST /recallTurn { terminalId, turnId }
+  # start/finish/noShow/recall: 409 si el turno no lo está atendiendo ESA terminal
+  # (turn.terminalId / terminal.currentTurnId), aunque el usuario tenga acceso a ella.
 
 POST /reassignTerminalQueues { terminalId, queueIds }
   → Terminal

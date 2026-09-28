@@ -625,6 +625,30 @@ describe("Terminal Service", () => {
 
       expect(startTurn("terminal-1", "turn-1")).rejects.toThrow();
     });
+
+    it("throws ConflictError if the turn is being served by another terminal", async () => {
+      const mockTurn: Turn = {
+        id: "turn-1",
+        memberNumber: 1,
+        queueId: "queue-1",
+        queuedAt: new Date(),
+        status: TurnStatus.CALLED,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: new Date(),
+        terminalId: "terminal-2",
+      };
+      const updateSpy = jest.fn();
+      (db.collection as jest.Mock).mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          get: jest.fn().mockResolvedValue({exists: true, data: () => mockTurn}),
+          update: updateSpy,
+        }),
+      });
+
+      await expect(startTurn("terminal-1", "turn-1")).rejects.toThrow(ConflictError);
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe("recallTurn", () => {
@@ -638,6 +662,7 @@ describe("Terminal Service", () => {
         channel: "totem",
         recallCount: 1,
         createdAt: new Date(),
+        terminalId: "terminal-1",
       };
       const updateSpy = jest.fn().mockResolvedValue(undefined);
 
@@ -686,6 +711,29 @@ describe("Terminal Service", () => {
 
       await expect(recallTurn("terminal-1", "invalid-turn")).rejects.toThrow();
     });
+    it("throws ConflictError if the turn is being served by another terminal", async () => {
+      const mockTurn: Turn = {
+        id: "turn-1",
+        memberNumber: 1,
+        queueId: "queue-1",
+        queuedAt: new Date(),
+        status: TurnStatus.CALLED,
+        channel: "totem",
+        recallCount: 0,
+        createdAt: new Date(),
+        terminalId: "terminal-2",
+      };
+      const updateSpy = jest.fn();
+      (db.collection as jest.Mock).mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          get: jest.fn().mockResolvedValue({exists: true, data: () => mockTurn}),
+          update: updateSpy,
+        }),
+      });
+
+      await expect(recallTurn("terminal-1", "turn-1")).rejects.toThrow(ConflictError);
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe("finishTurn", () => {
@@ -698,6 +746,17 @@ describe("Terminal Service", () => {
 
       expect(finishTurn("invalid-terminal", "turn-1")).rejects.toThrow();
     });
+
+    it("throws ConflictError without writing if the terminal is serving a different turn", async () => {
+      (db.collection as jest.Mock).mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          get: jest.fn().mockResolvedValue({exists: true, data: () => ({currentTurnId: "turn-other"})}),
+        }),
+      });
+
+      await expect(finishTurn("terminal-1", "turn-1")).rejects.toThrow(ConflictError);
+      expect(db.runTransaction).not.toHaveBeenCalled();
+    });
   });
 
   describe("handleNoShow", () => {
@@ -708,7 +767,7 @@ describe("Terminal Service", () => {
     ) {
       const transaction = mockRunTransaction();
       transaction.get
-        .mockResolvedValueOnce({exists: true}) // terminal
+        .mockResolvedValueOnce({exists: true, data: () => ({currentTurnId: turn.id})}) // terminal
         .mockResolvedValueOnce({exists: true, data: () => turn}) // turn
         .mockResolvedValueOnce({exists: true, data: () => queue}); // queue
       if (waitingTurns) {
@@ -726,6 +785,15 @@ describe("Terminal Service", () => {
       transaction.get.mockResolvedValueOnce({exists: false});
 
       await expect(handleNoShow("invalid-terminal", "turn-1")).rejects.toThrow(NotFoundError);
+      expect(transaction.update).not.toHaveBeenCalled();
+    });
+
+    it("throws ConflictError without writing if the terminal is serving a different turn", async () => {
+      mockCollectionDocs();
+      const transaction = mockRunTransaction();
+      transaction.get.mockResolvedValueOnce({exists: true, data: () => ({currentTurnId: "turn-other"})});
+
+      await expect(handleNoShow("terminal-1", "turn-1")).rejects.toThrow(ConflictError);
       expect(transaction.update).not.toHaveBeenCalled();
     });
 

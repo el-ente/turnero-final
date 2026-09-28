@@ -16,6 +16,14 @@ export function nextRatioCounterState(config: RatioBasedConfig, isPriority: bool
   return {normalCounterState: normal, priorityCounterState: priority};
 }
 
+// Every per-turn action takes terminalId from the caller, and the access
+// check runs against that id — so the turn must be verified to actually
+// belong to it, or one terminal could finish/no-show another's turn and
+// strand that terminal's currentTurnId on a closed turn.
+function turnNotOnTerminalError(turnId: string, terminalId: string): ConflictError {
+  return new ConflictError(`Turn ${turnId} is not being served by terminal ${terminalId}`);
+}
+
 export async function getTerminalById(terminalId: string): Promise<Terminal> {
   const terminalDoc = await db.collection("terminals").doc(terminalId).get();
   if (!terminalDoc.exists) {
@@ -179,6 +187,7 @@ export async function startTurn(terminalId: string, turnId: string): Promise<voi
   if (turn.status !== TurnStatus.CALLED) {
     throw new ConflictError(`Turn is not in CALLED status (current: ${turn.status})`);
   }
+  if (turn.terminalId !== terminalId) throw turnNotOnTerminalError(turnId, terminalId);
 
   await updateTurnStatus(turnId, TurnStatus.ATTENDING);
 }
@@ -187,6 +196,9 @@ export async function finishTurn(terminalId: string, turnId: string): Promise<vo
   const terminalDoc = await db.collection("terminals").doc(terminalId).get();
   if (!terminalDoc.exists) {
     throw new NotFoundError(`Terminal ${terminalId} not found`);
+  }
+  if ((terminalDoc.data() as Terminal).currentTurnId !== turnId) {
+    throw turnNotOnTerminalError(turnId, terminalId);
   }
 
   const turnDoc = await db.collection("turns").doc(turnId).get();
@@ -221,6 +233,7 @@ export async function recallTurn(terminalId: string, turnId: string): Promise<vo
   if (turn.status !== TurnStatus.CALLED) {
     throw new ConflictError(`Turn is not in CALLED status (current: ${turn.status})`);
   }
+  if (turn.terminalId !== terminalId) throw turnNotOnTerminalError(turnId, terminalId);
 
   // Re-call: bump the count and stamp when, so the Display can tell this
   // apart from the original call and chime again — same turn id, so
@@ -239,6 +252,9 @@ export async function handleNoShow(terminalId: string, turnId: string): Promise<
     const terminalDoc = await transaction.get(terminalRef);
     if (!terminalDoc.exists) {
       throw new NotFoundError(`Terminal ${terminalId} not found`);
+    }
+    if ((terminalDoc.data() as Terminal).currentTurnId !== turnId) {
+      throw turnNotOnTerminalError(turnId, terminalId);
     }
 
     const turnDoc = await transaction.get(turnRef);
