@@ -5,8 +5,28 @@ import { createTurn, cancelTurn } from "../lib/api";
 import { toDate } from "../lib/dates";
 import { STATUS_LABELS } from "../lib/turnStatusLabels";
 import { db } from "../lib/firebase";
-import { collection, getDocs, query, doc, onSnapshot, where } from "firebase/firestore";
+import { collection, getDocs, query, doc, onSnapshot } from "firebase/firestore";
 import { TicketMark } from "../components/TicketMark";
+import { useTurnEstimate } from "../hooks/useTurnEstimate";
+
+const ESTIMATE_ROUNDING_MS = 5 * 60_000;
+const ESTIMATE_RANGE_MS = 10 * 60_000;
+
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+}
+
+// A 10-minute window reads as the approximation it is; an exact minute
+// would promise more precision than a call-pace average can give.
+function formatEstimateRange(estimatedAt: Date): string {
+  const fromMs = Math.floor(estimatedAt.getTime() / ESTIMATE_ROUNDING_MS) * ESTIMATE_ROUNDING_MS;
+  return `entre ${formatTime(new Date(fromMs))} y ${formatTime(new Date(fromMs + ESTIMATE_RANGE_MS))}`;
+}
+
+function formatTurnsAhead(position: number): string {
+  if (position === 0) return "Sos el próximo de tu fila";
+  return `${position} persona${position !== 1 ? "s" : ""} por delante en tu fila`;
+}
 
 // Unlike Totem (a shared kiosk that must reset fast for the next stranger),
 // this page is one visitor's own tab/device — it's meant to be left open,
@@ -32,7 +52,6 @@ export function WebTicketView() {
   const [listenerErrors, setListenerErrors] = useState<Record<string, boolean>>({});
   const setListenerError = (key: string, hasError: boolean) =>
     setListenerErrors((current) => ({ ...current, [key]: hasError }));
-  const hasConnectionError = Object.values(listenerErrors).some(Boolean);
 
   const parsedMemberNumber = Number(memberNumberInput);
   const isValidMemberNumber =
@@ -88,34 +107,8 @@ export function WebTicketView() {
     return unsubscribe;
   }, [turnId]);
 
-  // Live count of waiting turns ahead of this one in the same queue
-  const [aheadCount, setAheadCount] = useState<number | null>(null);
-  useEffect(() => {
-    if (!currentTurn || currentTurn.status !== "waiting") {
-      setAheadCount(null);
-      return;
-    }
-    const q = query(
-      collection(db, "turns"),
-      where("queueId", "==", currentTurn.queueId),
-      where("status", "==", "waiting")
-    );
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        setListenerError("aheadCount", false);
-        const ahead = snapshot.docs
-          .map((d) => d.data() as Turn)
-          .filter((t) => toDate(t.queuedAt).getTime() < toDate(currentTurn.queuedAt).getTime()).length;
-        setAheadCount(ahead);
-      },
-      (error) => {
-        console.error("WebTicketView ahead-count listener:", error);
-        setListenerError("aheadCount", true);
-      }
-    );
-    return unsubscribe;
-  }, [currentTurn?.queueId, currentTurn?.status, currentTurn?.queuedAt]);
+  const { estimate, hasError: hasEstimateError } = useTurnEstimate(currentTurn);
+  const hasConnectionError = Object.values(listenerErrors).some(Boolean) || hasEstimateError;
 
   const handleMemberNumberChange = (value: string) => {
     setMemberNumberInput(value.replace(/\D/g, "").slice(0, 5));
@@ -213,14 +206,15 @@ export function WebTicketView() {
             <div className={`wt-status ${isCalled ? "wt-status-called" : ""}`}>
               {STATUS_LABELS[currentTurn.status] ?? currentTurn.status}
             </div>
-            {currentTurn.status === "waiting" && aheadCount !== null && (
-              <div className="wt-position">
-                {aheadCount === 0 ? "Sos el próximo" : `${aheadCount} persona${aheadCount !== 1 ? "s" : ""} por delante tuyo`}
-              </div>
+            {estimate && (
+              <>
+                <div className="wt-position">{formatTurnsAhead(estimate.position)}</div>
+                <div className="wt-eta">Te llamarían aprox. {formatEstimateRange(estimate.estimatedAt)}</div>
+              </>
             )}
             {isCalled && <div className="wt-called-hint">Dirigite al mostrador</div>}
             <div className="wt-time">
-              {toDate(currentTurn.createdAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+              {formatTime(toDate(currentTurn.createdAt))}
             </div>
             {currentTurn.recallCount > 0 && (
               <div className="wt-recall">Rellamado {currentTurn.recallCount}x</div>
@@ -602,6 +596,8 @@ const wtBaseStyles = `
   }
 
   .wt-position { font-size: 0.85rem; font-weight: 500; color: var(--secondary); margin-bottom: 0.25rem; }
+
+  .wt-eta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem; }
 
   .wt-called-hint {
     font-size: 0.9rem;
