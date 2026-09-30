@@ -1,4 +1,3 @@
-import * as admin from "firebase-admin";
 import {
   Sector,
   Queue,
@@ -9,27 +8,109 @@ import {
   Turn,
   TurnStatus,
 } from "shared";
+// Shares the app's Firestore handle so the seed can reuse services; the
+// emulator target and project id come from FIRESTORE_EMULATOR_HOST /
+// GCLOUD_PROJECT set by the `seed:emulator` script.
+import {db} from "./config/firebase-admin";
+import {backfillDailyStats} from "./services/dailyStatsService";
+import {lastDatesEndingYesterday, argentinaMidnightRangeFor, dayOfWeekInArgentina} from "./utils/argentinaTime";
 
-// Initialize Firebase (will use emulator if FIRESTORE_EMULATOR_HOST is set)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: process.env.FIREBASE_PROJECT_ID || "turnero-60150",
+const HISTORY_DAYS = 14;
+const SUNDAY = 0;
+const PRIORITY_QUEUE_SHARE = 0.4;
+const FIRESTORE_BATCH_LIMIT = 400;
+// Typical arrivals per hour for a regular queue: a late-morning peak and a
+// smaller one mid-afternoon, so the hourly heatmap has something to say.
+const ARRIVALS_PER_HOUR: Record<number, number> = {8: 2, 9: 4, 10: 7, 11: 8, 12: 5, 13: 3, 14: 3, 15: 5, 16: 6, 17: 3};
+
+// Deterministic PRNG (mulberry32) so every seed run yields the same history.
+function createRandom(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state = (state + 0x6D2B79F5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+async function writeInBatches<T extends {id: string}>(collection: string, docs: T[]): Promise<void> {
+  for (let i = 0; i < docs.length; i += FIRESTORE_BATCH_LIMIT) {
+    const batch = db.batch();
+    docs.slice(i, i + FIRESTORE_BATCH_LIMIT).forEach((doc) => batch.set(db.collection(collection).doc(doc.id), doc));
+    await batch.commit();
+  }
+}
+
+async function clearCollection(collection: string): Promise<void> {
+  const snapshot = await db.collection(collection).get();
+  for (let i = 0; i < snapshot.docs.length; i += FIRESTORE_BATCH_LIMIT) {
+    const batch = db.batch();
+    snapshot.docs.slice(i, i + FIRESTORE_BATCH_LIMIT).forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+  }
+}
+
+function historicalTurnsForHour(
+  queue: Queue, terminalId: string, date: string, hour: number, random: () => number, nextMember: () => number
+): Turn[] {
+  const load = ARRIVALS_PER_HOUR[hour] * (queue.type === QueueType.PRIORITY ? PRIORITY_QUEUE_SHARE : 1);
+  const count = Math.round(load * (0.7 + random() * 0.6));
+  const hourStart = argentinaMidnightRangeFor(date).start.getTime() + hour * 3600000;
+
+  return Array.from({length: count}, (_, i) => {
+    const createdAt = new Date(hourStart + Math.floor(random() * 60) * 60000);
+    const waitMinutes = 2 + load * 1.5 + random() * 4;
+    const serviceMinutes = 4 + random() * 6;
+    const calledAt = new Date(createdAt.getTime() + waitMinutes * 60000);
+    const attendingAt = new Date(calledAt.getTime() + 30000);
+    return {
+      id: `hist-${queue.id}-${date}-${hour}-${i}`,
+      memberNumber: nextMember(),
+      queueId: queue.id,
+      queuedAt: createdAt,
+      status: TurnStatus.FINISHED,
+      channel: "totem",
+      recallCount: 0,
+      createdAt,
+      calledAt,
+      attendingAt,
+      finishedAt: new Date(attendingAt.getTime() + serviceMinutes * 60000),
+      terminalId,
+    };
   });
 }
 
-const db = admin.firestore();
+// Finished turns spread over the last HISTORY_DAYS (no Sundays), one
+// realistic day per queue, so Admin → Estadísticas → "Por franja horaria"
+// shows a peak instead of an empty grid on a fresh emulator.
+function buildHistoricalTurns(queues: Queue[], terminals: Terminal[]): Turn[] {
+  const random = createRandom(2026);
+  let member = 50000;
+  const nextMember = () => member++;
+  const turns: Turn[] = [];
+
+  for (const date of lastDatesEndingYesterday(HISTORY_DAYS)) {
+    if (dayOfWeekInArgentina(date) === SUNDAY) continue;
+    for (const queue of queues) {
+      const terminal = terminals.find((t) => t.sectorIds.includes(queue.sectorId));
+      if (!terminal) continue;
+      for (const hour of Object.keys(ARRIVALS_PER_HOUR).map(Number)) {
+        turns.push(...historicalTurnsForHour(queue, terminal.id, date, hour, random, nextMember));
+      }
+    }
+  }
+  return turns;
+}
 
 async function seed() {
   console.log("Seeding Firestore...");
 
   try {
     // Clear existing data
-    const collections = ["sectors", "queues", "terminals", "turns"];
+    const collections = ["sectors", "queues", "terminals", "turns", "queueDailyStats"];
     for (const col of collections) {
-      const snapshot = await db.collection(col).get();
-      const batch = db.batch();
-      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
+      await clearCollection(col);
       console.log(`Cleared ${col}`);
     }
 
@@ -323,6 +404,14 @@ async function seed() {
       await db.collection("turns").doc(turn.id).set(turn);
     }
     console.log(`Created ${turns.length} turns`);
+
+    // 5. Historical finished turns + their daily rollups (hourly heatmap data).
+    const historicalTurns = buildHistoricalTurns(queues, terminals);
+    await writeInBatches("turns", historicalTurns);
+    console.log(`Created ${historicalTurns.length} historical turns over ${HISTORY_DAYS} days`);
+
+    const rollup = await backfillDailyStats(HISTORY_DAYS);
+    console.log(`Rolled up ${rollup.processed} queue-days (${rollup.failed.length} failed)`);
 
     console.log("✓ Seed completed successfully");
     process.exit(0);

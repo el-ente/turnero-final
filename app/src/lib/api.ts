@@ -150,6 +150,33 @@ export async function getTerminalStats(queueId: string) {
   return callFunction<TerminalStatsBreakdown>("getTerminalStats", "GET", undefined, { queueId });
 }
 
+export interface HourlyCell {
+  dayOfWeek: number; // 0 = domingo … 6 = sábado
+  hour: number; // 0-23, hora Argentina
+  created: number;
+  finished: number;
+  avgCreatedPerDay: number;
+  avgWaitTimeSeconds: number | null;
+  avgServiceTimeSeconds: number | null;
+}
+
+export interface HourlyStats {
+  sectorId: string;
+  queueId: string | null;
+  days: number;
+  from: string;
+  to: string;
+  datesCovered: number;
+  firstDate: string | null;
+  cells: HourlyCell[];
+}
+
+export async function getHourlyStats(sectorId: string, days: number, queueId?: string) {
+  const params: Record<string, string> = { sectorId, days: String(days) };
+  if (queueId) params.queueId = queueId;
+  return callFunction<HourlyStats>("getHourlyStats", "GET", undefined, params);
+}
+
 // CRUD — Sectors
 export async function apiCreateSector(data: { name: string; description?: string }) {
   return callFunction<Sector>("createSector", "POST", data);

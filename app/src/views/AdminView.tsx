@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import type { Sector, Queue, Terminal, AppUser, AppointmentService, AppointmentBlock, AvailabilityRule } from "shared";
 import { UserRole, UserStatus } from "shared";
 import { AdminModal } from "../components/AdminModal";
-import type { SectorStats, TerminalStatsBreakdown } from "../lib/api";
+import { HourlyHeatmap } from "../components/HourlyHeatmap";
+import type { SectorStats, TerminalStatsBreakdown, HourlyStats } from "../lib/api";
+import { formatDuration as formatWait } from "../lib/format";
 import {
-  getQueueStats, getSectorStats, getTerminalStats,
+  getQueueStats, getSectorStats, getTerminalStats, getHourlyStats,
   apiListSectors, apiCreateSector, apiUpdateSector, apiDeleteSector,
   apiListQueues, apiCreateQueue, apiUpdateQueue, apiDeleteQueue,
   apiListTerminals, apiCreateTerminal, apiUpdateTerminal, apiDeleteTerminal,
@@ -24,22 +26,17 @@ const ROLE_LABELS: Record<string, string> = {
 
 const QUEUE_TYPE_LABELS: Record<string, string> = { normal: "Normal", priority: "Prioritaria" };
 
+const HOURLY_RANGE_PRESETS = [
+  { days: 7, label: "7 días" },
+  { days: 30, label: "30 días" },
+  { days: 90, label: "90 días" },
+];
+
 function formatAvailabilityRules(rules: AvailabilityRule[]): string {
   if (rules.length === 0) return "Sin franjas cargadas";
   return rules
     .map((r) => `${r.daysOfWeek.map((d) => DAY_LABELS[d]).join("/")} ${r.startTime}-${r.endTime}`)
     .join("; ");
-}
-
-/** avgWaitTimeSeconds/avgServiceTimeSeconds arrive as raw seconds, or null when no turn finished today. */
-function formatWait(seconds: number | null): string {
-  if (seconds === null) return "—";
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
 type ModalMode =
@@ -72,6 +69,9 @@ export function AdminView() {
   const [statsData, setStatsData] = useState<any>(null);
   const [terminalStatsData, setTerminalStatsData] = useState<TerminalStatsBreakdown | null>(null);
   const [sectorStatsData, setSectorStatsData] = useState<SectorStats | null>(null);
+  const [hourlyStats, setHourlyStats] = useState<HourlyStats | null>(null);
+  const [hourlyDays, setHourlyDays] = useState(HOURLY_RANGE_PRESETS[0].days);
+  const [hourlyQueueId, setHourlyQueueId] = useState("");
   const [selectedQueueId, setSelectedQueueId] = useState<string>("");
   const [selectedSectorId, setSelectedSectorId] = useState<string>("");
   const [modal, setModal] = useState<ModalMode>(null);
@@ -105,6 +105,16 @@ export function AdminView() {
 
   useEffect(() => { loadData(); }, []);
 
+  const hourlySectorId = sectorStatsData?.sectorId ?? null;
+  useEffect(() => {
+    if (!hourlySectorId) { setHourlyStats(null); return; }
+    let cancelled = false;
+    getHourlyStats(hourlySectorId, hourlyDays, hourlyQueueId || undefined)
+      .then((stats) => { if (!cancelled) setHourlyStats(stats); })
+      .catch(() => { if (!cancelled) showToast("error", "Error obteniendo franjas horarias"); });
+    return () => { cancelled = true; };
+  }, [hourlySectorId, hourlyDays, hourlyQueueId]);
+
   const handleGetStats = async (queueId: string) => {
     try {
       const [stats, terminalStats] = await Promise.all([getQueueStats(queueId), getTerminalStats(queueId)]);
@@ -123,6 +133,7 @@ export function AdminView() {
       setStatsData(null);
       setTerminalStatsData(null);
       setSelectedSectorId(sectorId);
+      setHourlyQueueId("");
       setTab("stats");
     } catch { showToast("error", "Error obteniendo estadísticas del sector"); }
   };
@@ -568,6 +579,34 @@ export function AdminView() {
                     </tbody>
                   </table>
                 </div>
+
+                <div className="adm-section-top adm-hourly-top">
+                  <div className="adm-section-heading">
+                    <h3>Por franja horaria</h3>
+                    <span className="adm-count-stamp">día de semana × hora</span>
+                  </div>
+                  <div className="adm-hourly-controls">
+                    <div className="adm-segmented" role="group" aria-label="Período">
+                      {HOURLY_RANGE_PRESETS.map((preset) => (
+                        <button
+                          key={preset.days}
+                          type="button"
+                          className={hourlyDays === preset.days ? "active" : ""}
+                          onClick={() => setHourlyDays(preset.days)}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                    <select className="form-select" value={hourlyQueueId} onChange={(e) => setHourlyQueueId(e.target.value)}>
+                      <option value="">Todas las colas</option>
+                      {queues.filter((q) => q.sectorId === sectorStatsData.sectorId).map((q) => (
+                        <option key={q.id} value={q.id}>{q.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {hourlyStats && <HourlyHeatmap stats={hourlyStats} />}
               </>
             )}
 
@@ -1640,6 +1679,79 @@ const adminStyles = `
     color: var(--primary);
     line-height: 1;
   }
+
+  .adm-hourly-top { margin-top: 2rem; }
+  .adm-hourly-top h3 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 500; }
+  .adm-hourly-controls { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+
+  .adm-segmented {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .adm-segmented button {
+    padding: 0.45rem 0.9rem;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .adm-segmented button + button { border-left: 1px solid var(--border); }
+  .adm-segmented button:hover { background: var(--surface-warm); color: var(--text); }
+  .adm-segmented button.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+  .adm-heatmap-wrap { overflow-x: auto; }
+  .adm-heatmap {
+    border-collapse: separate;
+    border-spacing: 3px;
+    font-size: 0.8rem;
+    min-width: 100%;
+  }
+  .adm-heatmap th {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    text-align: center;
+    padding: 0.2rem 0.1rem;
+  }
+  .adm-heatmap tbody th { text-align: right; padding-right: 0.5rem; }
+  .adm-heat-cell {
+    text-align: center;
+    min-width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 6px;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--primary-light);
+    cursor: default;
+  }
+  .adm-heat-cell.empty { background: var(--surface-warm); color: var(--text-light); font-weight: 400; }
+  .adm-heat-cell.critical { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .adm-heat-legend {
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+  .adm-heat-swatch {
+    display: inline-block;
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 3px;
+    background: linear-gradient(90deg, rgba(212,96,58,0.15), rgba(212,96,58,0.9));
+    vertical-align: -2px;
+    margin-right: 0.3rem;
+  }
+  .adm-heat-swatch.critical { background: var(--surface); outline: 2px solid var(--accent); outline-offset: -2px; }
+  .adm-heat-note { margin-top: 0.5rem; font-size: 0.78rem; color: var(--text-light); }
 
   .adm-toast {
     position: fixed;

@@ -9,7 +9,7 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "seed:emulator": "npm run build && FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_PROJECT_ID=turnero-1212-dev node lib/functions/src/seed.js",
+    "seed:emulator": "npm run build && FIRESTORE_EMULATOR_HOST=localhost:8080 GCLOUD_PROJECT=turnero-1212-dev node lib/functions/src/seed.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
