@@ -20,6 +20,8 @@ export interface Queue {
   priorityWeight?: number;
   servedBy: string[]; // terminal IDs
   active: boolean; // false = closed to new turns, without losing config
+  lastCalledAt?: Date;
+  avgCallIntervalSeconds?: number; // rolling average of time between calls, written by callTurn
   createdAt: Date;
   updatedAt: Date;
 }

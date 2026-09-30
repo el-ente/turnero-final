@@ -1,6 +1,6 @@
 import {
   getNextTurn, callTurn, startTurn, finishTurn, recallTurn, handleNoShow, nextRatioCounterState,
-  reassignTerminalQueues, setTerminalStatus,
+  nextAvgCallIntervalSeconds, reassignTerminalQueues, setTerminalStatus,
 } from "../services/terminalService";
 import {db} from "../config/firebase-admin";
 import {Terminal, Turn, TurnStatus, TerminalStatus, ServingStrategy, Queue} from "shared";
@@ -353,6 +353,20 @@ describe("Terminal Service", () => {
     });
   });
 
+  describe("nextAvgCallIntervalSeconds", () => {
+    it("takes the first sample as the average", () => {
+      expect(nextAvgCallIntervalSeconds(undefined, 120)).toBe(120);
+    });
+
+    it("blends a new sample into the previous average", () => {
+      expect(nextAvgCallIntervalSeconds(300, 120)).toBe(264);
+    });
+
+    it("caps a single sample at 30 minutes", () => {
+      expect(nextAvgCallIntervalSeconds(undefined, 5000)).toBe(1800);
+    });
+  });
+
   describe("callTurn", () => {
     it("should throw NotFoundError if terminal not found", async () => {
       mockCollectionDocs();
@@ -499,10 +513,14 @@ describe("Terminal Service", () => {
 
       await callTurn("terminal-1", "turn-1");
 
-      expect(transaction.update).toHaveBeenCalledTimes(2);
+      expect(transaction.update).toHaveBeenCalledTimes(3);
       expect(transaction.update).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({status: TurnStatus.CALLED, terminalId: "terminal-1"})
+      );
+      expect(transaction.update).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({lastCalledAt: expect.any(Date), avgCallIntervalSeconds: expect.any(Number)})
       );
       expect(transaction.update).toHaveBeenCalledWith(
         expect.anything(),
@@ -598,6 +616,69 @@ describe("Terminal Service", () => {
           }),
         })
       );
+    });
+
+    describe("call pace", () => {
+      const fifoTerminal: Terminal = {
+        id: "terminal-1",
+        name: "Terminal 1",
+        sectorIds: ["sector-1"],
+        activeQueueIds: ["queue-1"],
+        servingStrategy: ServingStrategy.FIFO_ACROSS_QUEUES,
+        strategyConfig: {strategy: ServingStrategy.FIFO_ACROSS_QUEUES},
+        status: "available",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      function waitingTurnQueuedSecondsAgo(seconds: number): Turn {
+        return {
+          id: "turn-1",
+          memberNumber: 1,
+          queueId: "queue-1",
+          queuedAt: fakeTimestamp(Date.now() - seconds * 1000),
+          status: TurnStatus.WAITING,
+          channel: "totem",
+          recallCount: 0,
+          createdAt: new Date(),
+        };
+      }
+
+      async function callWithQueue(turn: Turn, queue: Partial<Queue>) {
+        mockCollectionDocs();
+        const transaction = mockRunTransaction();
+        transaction.get
+          .mockResolvedValueOnce({exists: true, data: () => fifoTerminal})
+          .mockResolvedValueOnce({exists: true, data: () => turn})
+          .mockResolvedValueOnce({exists: true, data: () => queue});
+        await callTurn("terminal-1", "turn-1");
+        return transaction;
+      }
+
+      it("blends the time since the previous call into the queue's average", async () => {
+        const transaction = await callWithQueue(waitingTurnQueuedSecondsAgo(600), {
+          type: "normal",
+          lastCalledAt: fakeTimestamp(Date.now() - 120_000),
+          avgCallIntervalSeconds: 300,
+        });
+
+        expect(transaction.update).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({avgCallIntervalSeconds: 264})
+        );
+      });
+
+      it("measures from when the turn joined if the queue was idle since the previous call", async () => {
+        const transaction = await callWithQueue(waitingTurnQueuedSecondsAgo(60), {
+          type: "normal",
+          lastCalledAt: fakeTimestamp(Date.now() - 3_600_000),
+        });
+
+        expect(transaction.update).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({avgCallIntervalSeconds: 60})
+        );
+      });
     });
   });
 

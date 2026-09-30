@@ -119,6 +119,34 @@ async function getNextTurnRatioBased(terminal: Terminal): Promise<Turn | null> {
   return turnToServe;
 }
 
+// Mi Turno estimates when a waiting customer gets called from each queue's
+// call pace. Measuring it per queue (not per terminal) means it already
+// reflects how many terminals serve the queue and how they split their time
+// with other queues or ratio strategies, without modeling any of that.
+const CALL_INTERVAL_EMA_WEIGHT = 0.2;
+// One unstaffed stretch (lunch break, late opening) must not wreck the average.
+const MAX_CALL_INTERVAL_SAMPLE_SECONDS = 30 * 60;
+
+export function nextAvgCallIntervalSeconds(previous: number | undefined, sampleSeconds: number): number {
+  const sample = Math.min(sampleSeconds, MAX_CALL_INTERVAL_SAMPLE_SECONDS);
+  if (previous === undefined) return Math.round(sample);
+  return Math.round(previous * (1 - CALL_INTERVAL_EMA_WEIGHT) + sample * CALL_INTERVAL_EMA_WEIGHT);
+}
+
+function callPaceUpdate(queue: Queue, calledTurn: Turn, now: Date) {
+  // Time with nobody waiting isn't call pace, so the interval starts at
+  // whichever came last: the previous call or this turn joining the line.
+  const intervalStartMs = Math.max(
+    queue.lastCalledAt ? toMillis(queue.lastCalledAt) : 0,
+    toMillis(calledTurn.queuedAt),
+  );
+  const sampleSeconds = Math.max(0, (now.getTime() - intervalStartMs) / 1000);
+  return {
+    lastCalledAt: now,
+    avgCallIntervalSeconds: nextAvgCallIntervalSeconds(queue.avgCallIntervalSeconds, sampleSeconds),
+  };
+}
+
 export async function callTurn(terminalId: string, turnId: string): Promise<void> {
   await db.runTransaction(async (transaction) => {
     const terminalRef = db.collection("terminals").doc(terminalId);
@@ -154,12 +182,17 @@ export async function callTurn(terminalId: string, turnId: string): Promise<void
 
     const queueRef = db.collection("queues").doc(turn.queueId);
     const queueDoc = await transaction.get(queueRef);
+    const now = new Date();
 
     transaction.update(turnRef, {
       status: TurnStatus.CALLED,
-      calledAt: new Date(),
+      calledAt: now,
       terminalId,
     });
+
+    if (queueDoc.exists) {
+      transaction.update(queueRef, callPaceUpdate(queueDoc.data() as Queue, turn, now));
+    }
 
     const terminalUpdate: Record<string, unknown> = {currentTurnId: turnId};
 
