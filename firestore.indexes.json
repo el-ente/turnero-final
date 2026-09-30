@@ -49,6 +49,15 @@
       ]
     },
     {
+      "collectionGroup": "queueDailyStats",
+      "queryScope": "COLLECTION_GROUP",
+      "apiScope": "ANY_API",
+      "fields": [
+        { "fieldPath": "queueId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "appointments",
       "queryScope": "COLLECTION_GROUP",
       "apiScope": "ANY_API",

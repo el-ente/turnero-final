@@ -1,0 +1,27 @@
+meta {
+  name: Backfill Daily Stats
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/backfillDailyStats
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+body:json {
+  {
+    "days": 30
+  }
+}
+
+docs {
+  Solo admin. Recalcula los últimos `days` días (1-365, default 30, terminando ayer)
+  de queueDailyStats para todas las colas. Idempotente: sobreescribe cada doc.
+  Respuesta: { processed, failed: ["queueId_YYYY-MM-DD", ...] }.
+}

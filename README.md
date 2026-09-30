@@ -179,7 +179,7 @@ POST /reassignTerminalQueues { terminalId, queueIds }
 
 ### Admin
 
-CRUD de sectors/queues/terminals: solo admin. Stats (`getQueueStats`/`getSectorStats`/`getTerminalStats`): admin o supervisor.
+CRUD de sectors/queues/terminals y `backfillDailyStats`: solo admin. Stats (`getQueueStats`/`getSectorStats`/`getTerminalStats`/`getQueueDailyStats`/`getHourlyStats`): admin o supervisor.
 
 ```bash
 GET /getQueueStats?queueId=queue-1
@@ -205,6 +205,24 @@ GET /getQueueDailyStats?queueIds=queue-1,queue-2&days=7
   # Lectura cruda de queueDailyStats (días sin rollup — hoy, o anteriores al deploy de este
   # pipeline — se omiten en silencio, no se rellenan con ceros). days: 1-90, default 7.
   # Sin UI de tendencia todavía (no hay librería de gráficos elegida).
+
+GET /getHourlyStats?sectorId=sector-1&days=7&queueId=queue-1
+  → { sectorId, queueId: string|null, days, from, to, datesCovered, firstDate: string|null,
+      cells: [{ dayOfWeek (0=Dom…6=Sáb), hour (0-23, hora Argentina), created, finished,
+                avgCreatedPerDay, avgWaitTimeSeconds, avgServiceTimeSeconds }] }
+  # Franjas horarias para decidir dotación de mostradores: agrega los rollups de
+  # queueDailyStats.hourly de las colas del sector (o de una sola cola si viene queueId,
+  # que debe pertenecer al sector → 404 si no) por día de semana × hora. days: 1-90,
+  # default 7, ventana que termina ayer. avgCreatedPerDay = created / cantidad de fechas
+  # con rollup para ese día de semana. Solo devuelve celdas con created > 0. Rollups
+  # anteriores a los buckets horarios (sin `hourly`) se ignoran y no cuentan como fecha
+  # cubierta. Sector con más de 30 colas → 400 (mismo cap que getSectorStats).
+
+POST /backfillDailyStats { days?: 1-365 }   # default 30, solo admin
+  → { processed, failed: ["queueId_YYYY-MM-DD", ...] }
+  # Recalcula queueDailyStats para todas las colas en los últimos `days` días (terminando
+  # ayer), una fecha por vez. Idempotente (sobreescribe). Usar una vez tras desplegar los
+  # buckets horarios para que getHourlyStats tenga histórico, o para reparar días fallidos.
 ```
 
 **Función programada:** `dailyStatsRollup` corre todos los días a las 3am hora Argentina (`onSchedule`, timezone `America/Argentina/Buenos_Aires`). Recalcula el día anterior completo por cola y sobreescribe (`.set()`, no incremental) el doc en `queueDailyStats` — idempotente, se puede re-ejecutar para la misma fecha sin duplicar conteos. No toca `createTurn`/`callTurn`/`finishTurn`/`handleNoShow`/`cancelTurn`.
@@ -330,7 +348,7 @@ pnpm -F functions test:watch
 pnpm -F functions test:coverage
 ```
 
-**213 tests** covering turnService, queueService, terminalService, statsService, adminService, la capa de auth (middleware + gating de cada endpoint protegido), y el módulo de Agenda (appointmentAvailability, appointmentService, appointmentStaffService, appointmentConfigService, y rate-limit/auth-gating de sus controllers).
+**257 tests** covering turnService, queueService, terminalService, statsService, dailyStatsService, hourlyStatsService, adminService, la capa de auth (middleware + gating de cada endpoint protegido), y el módulo de Agenda (appointmentAvailability, appointmentService, appointmentStaffService, appointmentConfigService, y rate-limit/auth-gating de sus controllers).
 
 ### Testing Manual
 
@@ -380,7 +398,7 @@ firebase deploy --project dev --only hosting:app
 - **queues**: { id, sectorId, name, type, reenqueueConfig, servedBy[], ... }
 - **terminals**: { id, name, sectorIds[], activeQueueIds[], servingStrategy, ... }
 - **turns**: { id, memberNumber, queueId, status, queuedAt, ... }
-- **queueDailyStats**: { queueId, date (`YYYY-MM-DD`, día calendario Argentina), totalCreated, waitingCount, calledCount, attendingCount, finishedCount, noShowCount, cancelledCount, totalWaitTimeSeconds, totalServiceTimeSeconds, computedAt } — id `{queueId}_{date}`. Rollup diario por cola, escrito por la función programada `dailyStatsRollup` (ver más abajo); guarda sumas y counts, no promedios, para poder derivar totales de sector sumando sin re-escanear `turns`. Es la única collection sin acceso de cliente en absoluto (ni siquiera lectura pública): se escribe y se lee exclusivamente vía Admin SDK (Cloud Functions), así que no tiene entrada en `firestore.rules` — el default-deny ya alcanza.
+- **queueDailyStats**: { queueId, date (`YYYY-MM-DD`, día calendario Argentina), totalCreated, waitingCount, calledCount, attendingCount, finishedCount, noShowCount, cancelledCount, totalWaitTimeSeconds, totalServiceTimeSeconds, hourly[24] (`{created, finished, totalWaitTimeSeconds, totalServiceTimeSeconds}` por hora Argentina de creación del turno; espera/servicio solo de finalizados, atribuidos a la hora de llegada), computedAt } — id `{queueId}_{date}`. Índice compuesto `queueId + date` para la lectura por rango de `getHourlyStats`. Rollup diario por cola, escrito por la función programada `dailyStatsRollup` (ver más abajo); guarda sumas y counts, no promedios, para poder derivar totales de sector sumando sin re-escanear `turns`. Es la única collection sin acceso de cliente en absoluto (ni siquiera lectura pública): se escribe y se lee exclusivamente vía Admin SDK (Cloud Functions), así que no tiene entrada en `firestore.rules` — el default-deny ya alcanza.
 - **users**: { id, uid?, email, role (`admin`\|`supervisor`\|`cashier`), assignedSectorIds[], status (`pending`\|`active`), createdAt, updatedAt } — `id` es el `uid` de Firebase Auth una vez activo; mientras está `pending` (invitado por email, todavía no logueado) es un id autogenerado.
 
 El ticket mostrado en Totem/Display/Terminal **es** `memberNumber` — no hay numeración secuencial diaria ni reset a medianoche. `queuedAt` es la clave de orden interna (= `createdAt` al crear el turno, se adelanta al reencolar por no-show). `requeueCount` cuenta reencolados por no-show (tope `reenqueueConfig.maxAttempts`); `recallCount` cuenta solo los re-llamados del llamado actual y vuelve a 0 al reencolar — re-llamar no consume reencolados y reemplaza los antiguos `originalTurnNumber`/`currentTurnNumber`.

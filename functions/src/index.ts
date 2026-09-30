@@ -12,6 +12,7 @@ import {
 } from "./controllers/terminalController";
 import {
   getQueueStatsHandler, getSectorStatsHandler, getTerminalStatsHandler, getQueueDailyStatsHandler,
+  getHourlyStatsHandler, backfillDailyStatsHandler,
   createSectorHandler, listSectorsHandler, updateSectorHandler, deleteSectorHandler,
   createQueueHandler, listQueuesHandler, updateQueueHandler, deleteQueueHandler,
   createTerminalHandler, listTerminalsHandler, updateTerminalHandler, deleteTerminalHandler,
@@ -56,6 +57,8 @@ export const getQueueStats = getQueueStatsHandler;
 export const getSectorStats = getSectorStatsHandler;
 export const getTerminalStats = getTerminalStatsHandler;
 export const getQueueDailyStats = getQueueDailyStatsHandler;
+export const getHourlyStats = getHourlyStatsHandler;
+export const backfillDailyStats = backfillDailyStatsHandler;
 
 // Scheduled jobs
 export const dailyStatsRollup = dailyStatsRollupHandler;

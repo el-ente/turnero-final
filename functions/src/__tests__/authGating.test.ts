@@ -44,6 +44,8 @@ const GATED_HANDLERS: Record<string, (req: any, res: any) => void | Promise<void
   "admin.getSectorStats": adminController.getSectorStatsHandler,
   "admin.getTerminalStats": adminController.getTerminalStatsHandler,
   "admin.getQueueDailyStats": adminController.getQueueDailyStatsHandler,
+  "admin.getHourlyStats": adminController.getHourlyStatsHandler,
+  "admin.backfillDailyStats": adminController.backfillDailyStatsHandler,
   "admin.createSector": adminController.createSectorHandler,
   "admin.listSectors": adminController.listSectorsHandler,
   "admin.updateSector": adminController.updateSectorHandler,

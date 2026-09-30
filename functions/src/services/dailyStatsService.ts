@@ -1,7 +1,7 @@
 import {Turn, QueueDailyStats} from "shared";
 import {db} from "../config/firebase-admin";
-import {aggregateTurns} from "./statsService";
-import {yesterdayInArgentina, argentinaMidnightRangeFor} from "../utils/argentinaTime";
+import {aggregateTurns, aggregateTurnsByHour} from "./statsService";
+import {yesterdayInArgentina, argentinaMidnightRangeFor, lastDatesEndingYesterday} from "../utils/argentinaTime";
 
 function dailyStatsDocId(queueId: string, date: string): string {
   return `${queueId}_${date}`;
@@ -30,6 +30,7 @@ export async function computeQueueDailyStats(queueId: string, date: string): Pro
     cancelledCount: aggregate.cancelledCount,
     totalWaitTimeSeconds: aggregate.totalWaitTimeSeconds,
     totalServiceTimeSeconds: aggregate.totalServiceTimeSeconds,
+    hourly: aggregateTurnsByHour(turns),
     computedAt: new Date(),
   };
 }
@@ -46,28 +47,45 @@ export async function writeQueueDailyStats(queueId: string, date: string): Promi
 // inactive ones, since a queue closed mid-day still had turns that day and
 // skipping it would leave a silent gap in its trend. One queue failing
 // doesn't block the rest.
-export async function runDailyRollup(): Promise<{ processed: number; failed: string[] }> {
-  const date = yesterdayInArgentina();
-  const queuesSnap = await db.collection("queues").get();
-  const queueIds = queuesSnap.docs.map((doc) => doc.id);
+export interface RollupResult {
+  processed: number;
+  failed: string[];
+}
 
+async function rollupQueuesForDate(queueIds: string[], date: string): Promise<RollupResult> {
   const results = await Promise.allSettled(queueIds.map((queueId) => writeQueueDailyStats(queueId, date)));
   const failed = queueIds.filter((_, i) => results[i].status === "rejected");
-
   return {processed: queueIds.length - failed.length, failed};
 }
 
-function subtractDays(dateStr: string, days: number): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day - days)).toISOString().slice(0, 10);
+async function listQueueIds(): Promise<string[]> {
+  const queuesSnap = await db.collection("queues").get();
+  return queuesSnap.docs.map((doc) => doc.id);
+}
+
+export async function runDailyRollup(): Promise<RollupResult> {
+  return rollupQueuesForDate(await listQueueIds(), yesterdayInArgentina());
+}
+
+// Recomputes the last `days` days (ending yesterday) for every queue, one
+// date at a time so a long backfill doesn't fan out thousands of parallel
+// queries. Failures are reported as `{queueId}_{date}` and don't stop the rest.
+export async function backfillDailyStats(days: number): Promise<RollupResult> {
+  const queueIds = await listQueueIds();
+  const summary: RollupResult = {processed: 0, failed: []};
+  for (const date of lastDatesEndingYesterday(days)) {
+    const result = await rollupQueuesForDate(queueIds, date);
+    summary.processed += result.processed;
+    summary.failed.push(...result.failed.map((queueId) => dailyStatsDocId(queueId, date)));
+  }
+  return summary;
 }
 
 // Raw rollup docs for the given queues over the last `days` days (ending
 // yesterday — today has no rollup yet). Missing days (before the pipeline
 // existed, or today) are silently omitted, not padded with zeros.
 export async function getQueueDailyStatsRange(queueIds: string[], days: number): Promise<QueueDailyStats[]> {
-  const endDate = yesterdayInArgentina();
-  const dates = Array.from({length: days}, (_, i) => subtractDays(endDate, i));
+  const dates = lastDatesEndingYesterday(days);
   const refs = queueIds.flatMap((queueId) => dates.map((date) => db.collection("queueDailyStats").doc(dailyStatsDocId(queueId, date))));
   if (refs.length === 0) return [];
 

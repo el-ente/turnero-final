@@ -1,13 +1,16 @@
-import {Turn, TurnStatus} from "shared";
+import {Turn, TurnStatus, HourlyBucket} from "shared";
 import {db} from "../config/firebase-admin";
 import {NotFoundError, ValidationError} from "../utils/errors";
 import {toMillis} from "../utils/dates";
+import {hourInArgentina} from "../utils/argentinaTime";
+
+const HOURS_PER_DAY = 24;
 
 const ARGENTINA_OFFSET = -3 * 60; // UTC-3 in minutes
 
 // Firestore's "in" operator caps at 30 values (same cap noted in
 // adminService.ts's deleteSector / terminalService.ts's reassignTerminalQueues).
-const MAX_SECTOR_QUEUE_IDS = 30;
+export const MAX_SECTOR_QUEUE_IDS = 30;
 
 function getTodayMidnightInArgentina(): Date {
   const now = new Date();
@@ -77,6 +80,26 @@ export function aggregateTurns(turns: Turn[]): TurnAggregate {
   }
 
   return aggregate;
+}
+
+export function emptyHourlyBuckets(): HourlyBucket[] {
+  return Array.from({length: HOURS_PER_DAY}, () => ({
+    created: 0, finished: 0, totalWaitTimeSeconds: 0, totalServiceTimeSeconds: 0,
+  }));
+}
+
+export function aggregateTurnsByHour(turns: Turn[]): HourlyBucket[] {
+  const buckets = emptyHourlyBuckets();
+  for (const turn of turns) {
+    const bucket = buckets[hourInArgentina(toMillis(turn.createdAt))];
+    bucket.created++;
+    if (turn.status !== TurnStatus.FINISHED) continue;
+    const {totalWaitTimeSeconds, totalServiceTimeSeconds} = aggregateTurns([turn]);
+    bucket.finished++;
+    bucket.totalWaitTimeSeconds += totalWaitTimeSeconds;
+    bucket.totalServiceTimeSeconds += totalServiceTimeSeconds;
+  }
+  return buckets;
 }
 
 // null (not 0) when count is 0 — 0 would misleadingly imply instant service.

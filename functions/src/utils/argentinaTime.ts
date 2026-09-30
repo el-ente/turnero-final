@@ -24,6 +24,22 @@ export function yesterdayInArgentina(): string {
   return formatDate(yesterday);
 }
 
+export function subtractDays(dateStr: string, days: number): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day - days)).toISOString().slice(0, 10);
+}
+
+// Oldest first, ending yesterday — today is never included because its
+// rollup doesn't exist yet.
+export function lastDatesEndingYesterday(days: number): string[] {
+  const endDate = yesterdayInArgentina();
+  return Array.from({length: days}, (_, i) => subtractDays(endDate, days - 1 - i));
+}
+
+export function hourInArgentina(instantMillis: number): number {
+  return new Date(instantMillis + ARGENTINA_OFFSET * 60000).getUTCHours();
+}
+
 // dateStr is a plain "YYYY-MM-DD" Argentina calendar date. Returns the UTC
 // instants bounding that calendar day, for building Firestore range queries
 // against Timestamp fields (createdAt >= start && createdAt < end).

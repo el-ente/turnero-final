@@ -1,0 +1,27 @@
+meta {
+  name: Get Hourly Stats
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/getHourlyStats?sectorId={{sectorId}}&days=7&queueId=
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{idToken}}
+}
+
+params:query {
+  sectorId: 
+  days: 7
+  queueId: 
+}
+
+docs {
+  Franjas horarias (día de semana × hora, hora Argentina) agregadas desde queueDailyStats.
+  days: 1-90, default 7. queueId opcional: acota a una cola del sector.
+  Cubre hasta ayer (hoy no tiene rollup). Solo devuelve celdas con turnos creados.
+}

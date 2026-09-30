@@ -1,5 +1,5 @@
 import {
-  computeQueueDailyStats, writeQueueDailyStats, runDailyRollup, getQueueDailyStatsRange,
+  computeQueueDailyStats, writeQueueDailyStats, runDailyRollup, getQueueDailyStatsRange, backfillDailyStats,
 } from "../services/dailyStatsService";
 import {db} from "../config/firebase-admin";
 import {Turn, TurnStatus} from "shared";
@@ -53,6 +53,51 @@ describe("Daily Stats Service", () => {
       expect(stats.finishedCount).toBe(1);
       expect(stats.waitingCount).toBe(1);
       expect(stats.computedAt).toBeInstanceOf(Date);
+    });
+
+    it("includes 24 hourly buckets keyed by Argentina creation hour", async () => {
+      const turns = [makeTurn({createdAt: new Date("2026-09-26T13:00:00Z")})]; // 10:00 Argentina
+      (db.collection as jest.Mock).mockImplementation((name: string) => {
+        if (name === "turns") return {where: mockTurnsQuery(turns)};
+        throw new Error(`unexpected collection: ${name}`);
+      });
+
+      const stats = await computeQueueDailyStats("queue-1", "2026-09-26");
+
+      expect(stats.hourly).toHaveLength(24);
+      expect(stats.hourly[10].created).toBe(1);
+    });
+  });
+
+  describe("backfillDailyStats", () => {
+    it("writes one rollup per queue per day and reports failures as queueId_date", async () => {
+      const setSpy = jest.fn().mockResolvedValue(undefined);
+      const docSpy = jest.fn().mockReturnValue({set: setSpy});
+      (db.collection as jest.Mock).mockImplementation((name: string) => {
+        if (name === "queues") return {get: jest.fn().mockResolvedValue({docs: [{id: "queue-1"}, {id: "queue-2"}]})};
+        if (name === "turns") {
+          return {
+            where: jest.fn((_field: string, _op: string, queueId: string) => ({
+              where: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue({
+                  get: jest.fn().mockImplementation(() => (
+                    queueId === "queue-2" ? Promise.reject(new Error("boom")) : Promise.resolve({docs: []})
+                  )),
+                }),
+              }),
+            })),
+          };
+        }
+        if (name === "queueDailyStats") return {doc: docSpy};
+        throw new Error(`unexpected collection: ${name}`);
+      });
+
+      const result = await backfillDailyStats(3);
+
+      expect(result.processed).toBe(3);
+      expect(result.failed).toHaveLength(3);
+      expect(result.failed[0]).toMatch(/^queue-2_\d{4}-\d{2}-\d{2}$/);
+      expect(setSpy).toHaveBeenCalledTimes(3);
     });
   });
 
