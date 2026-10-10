@@ -1,3 +1,5 @@
+> **SUPERSEDED (2026-10-10)** by `docs/whatsapp-functional-spec-2026-10-10.md`, `docs/whatsapp-platform-research-2026-10-10.md` and `docs/whatsapp-technical-plan-2026-10-10.md`. Kept for history only.
+
 # WhatsApp Integration v1 — Implementation Plan
 
 ## Context

@@ -1,3 +1,5 @@
+> **SUPERSEDED (2026-10-10)** by `docs/whatsapp-functional-spec-2026-10-10.md`, `docs/whatsapp-platform-research-2026-10-10.md` and `docs/whatsapp-technical-plan-2026-10-10.md`. Kept for history only.
+
 # WhatsApp Integration — v1 Feature List
 
 Customer-facing scope for the first WhatsApp Business API integration. Derived from a functional analysis debate covering the existing data model (`Turn`, `TurnStatus`, `Channel`), the original multi-channel design intent (`project-specs.md`, README `Phase 14`), and known gaps (`docs/functional-ux-review-2026-08-04.md`, `docs/app-review-2026-08-04.md`).
